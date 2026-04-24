@@ -119,3 +119,22 @@ target_sources(ferment-eq PRIVATE
   eq/FermentEqEditor.h
   ${FERMENT_COMMON_SOURCES}
 )
+
+# ---- Ferment Utility ----
+ferment_add_plugin(
+  ferment-utility
+  "Ferment Utility"
+  "com.ferment.dsp.utility"
+  Frmt
+  FmUt
+  "https://ferment.dsp/lv2/utility"
+  "com.ferment.dsp.utility"
+  utility
+)
+target_sources(ferment-utility PRIVATE
+  utility/FermentUtilityProcessor.cpp
+  utility/FermentUtilityProcessor.h
+  utility/FermentUtilityEditor.cpp
+  utility/FermentUtilityEditor.h
+  ${FERMENT_COMMON_SOURCES}
+)
