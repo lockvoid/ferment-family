@@ -1,0 +1,67 @@
+#pragma once
+
+#include <juce_audio_processors/juce_audio_processors.h>
+
+namespace airwinconsolidated::GlueBlue { class GlueBlue; }
+
+// Standalone JUCE plugin wrapping the GlueBlue DSP with a warm-analog UI.
+// No dropdown selector, no help text — single-purpose pro tool.
+class FermentGlueProcessor : public juce::AudioProcessor
+{
+public:
+    FermentGlueProcessor();
+    ~FermentGlueProcessor() override;
+
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
+    void releaseResources() override;
+    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
+
+    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    void processBlock(juce::AudioBuffer<double>&, juce::MidiBuffer&) override;
+    bool supportsDoublePrecisionProcessing() const override { return true; }
+
+    juce::AudioProcessorEditor* createEditor() override;
+    bool hasEditor() const override { return true; }
+
+    const juce::String getName() const override { return "Ferment Glue"; }
+    bool acceptsMidi() const override { return false; }
+    bool producesMidi() const override { return false; }
+    double getTailLengthSeconds() const override { return 0.0; }
+
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram(int) override {}
+    const juce::String getProgramName(int) override { return "Default"; }
+    void changeProgramName(int, const juce::String&) override {}
+
+    void getStateInformation(juce::MemoryBlock& destData) override;
+    void setStateInformation(const void* data, int sizeInBytes) override;
+
+    // Ordered per GlueBlue kParamA..kParamJ
+    enum { kThreshold, kRatio, kAttack, kRelease, kMakeup,
+           kRange, kDryWet, kSideChain, kScHpf, kSoftClip,
+           kNumParams };
+
+    juce::AudioProcessorValueTreeState apvts;
+
+private:
+    std::unique_ptr<airwinconsolidated::GlueBlue::GlueBlue> dsp;
+
+    template <typename T>
+    struct Scratch
+    {
+        std::unique_ptr<juce::AudioBuffer<T>> monoBuffer;  // for SC silent fallback + mono main
+        std::unique_ptr<juce::AudioBuffer<T>> silentBuffer;
+        void prepare(int samplesPerBlock);
+        void reset();
+    };
+    Scratch<float> scratchF;
+    Scratch<double> scratchD;
+
+    template <typename T>
+    void processBlockT(juce::AudioBuffer<T>& buffer, Scratch<T>& scratch);
+
+    static juce::AudioProcessorValueTreeState::ParameterLayout buildLayout();
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FermentGlueProcessor)
+};
