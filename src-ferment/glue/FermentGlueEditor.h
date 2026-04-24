@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 class FermentGlueProcessor;
+class WarmLookAndFeel;
 
 class FermentGlueEditor : public juce::AudioProcessorEditor
 {
@@ -16,7 +17,6 @@ public:
 private:
     FermentGlueProcessor& processor;
 
-    class WarmLookAndFeel;
     std::unique_ptr<WarmLookAndFeel> lnf;
 
     struct KnobWithLabel

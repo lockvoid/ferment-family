@@ -1,93 +1,11 @@
 #include "FermentGlueEditor.h"
 #include "FermentGlueProcessor.h"
+#include "../common/WarmLookAndFeel.h"
+#include "../common/WarmPalette.h"
 
 #include <cmath>
 
-namespace
-{
-    // ---- Warm analog palette ----
-    const juce::Colour kChassis       { 0xff1c1410 }; // deep brown-black
-    const juce::Colour kChassisEdge   { 0xff0f0a07 }; // edge shadow
-    const juce::Colour kPanel         { 0xff2a201a }; // slightly raised panel
-    const juce::Colour kPanelHi       { 0xff332820 }; // highlight edge
-    const juce::Colour kKnobBody      { 0xff3a2f25 };
-    const juce::Colour kKnobBodyDark  { 0xff1f1712 };
-    const juce::Colour kKnobRim       { 0xff4a3a2d };
-    const juce::Colour kAmber         { 0xffe0a040 }; // tube-glow indicator
-    const juce::Colour kAmberDim      { 0xff8a5a20 };
-    const juce::Colour kLabelCream    { 0xffd4c4a8 }; // aged ivory
-    const juce::Colour kLabelDim      { 0xff7a6a50 };
-    const juce::Colour kSeparator     { 0xff4a3828 };
-}
-
-// =============================================================================
-//  WarmLookAndFeel  —  classic rotary knob with amber indicator line,
-//                      brass rim, small cream value readout.
-// =============================================================================
-class FermentGlueEditor::WarmLookAndFeel : public juce::LookAndFeel_V4
-{
-public:
-    WarmLookAndFeel()
-    {
-        setColour(juce::Slider::rotarySliderFillColourId,    kAmber);
-        setColour(juce::Slider::rotarySliderOutlineColourId, kKnobRim);
-        setColour(juce::Label::textColourId,                 kLabelCream);
-    }
-
-    void drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h,
-                          float sliderPos, float rotaryStart, float rotaryEnd,
-                          juce::Slider&) override
-    {
-        auto bounds = juce::Rectangle<float>((float)x, (float)y, (float)w, (float)h).reduced(3.0f);
-        const float radius = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.45f;
-        const auto  centre = bounds.getCentre();
-        const float angle  = rotaryStart + sliderPos * (rotaryEnd - rotaryStart);
-
-        // --- Outer rim (brass) ---
-        g.setColour(kKnobRim.darker(0.25f));
-        g.fillEllipse(centre.x - radius - 2, centre.y - radius - 2,
-                      (radius + 2) * 2, (radius + 2) * 2);
-
-        // --- Knob body with slight radial gradient for depth ---
-        juce::ColourGradient body(kKnobBody,      centre.x, centre.y - radius * 0.4f,
-                                  kKnobBodyDark,  centre.x, centre.y + radius * 0.8f, false);
-        g.setGradientFill(body);
-        g.fillEllipse(centre.x - radius, centre.y - radius, radius * 2, radius * 2);
-
-        // --- Inner shadow ring ---
-        g.setColour(kChassisEdge.withAlpha(0.6f));
-        g.drawEllipse(centre.x - radius, centre.y - radius, radius * 2, radius * 2, 1.0f);
-
-        // --- Arc showing value (amber glow, subtle) ---
-        {
-            juce::Path arc;
-            arc.addCentredArc(centre.x, centre.y, radius + 1.5f, radius + 1.5f,
-                              0.0f, rotaryStart, angle, true);
-            g.setColour(kAmber.withAlpha(0.35f));
-            g.strokePath(arc, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved,
-                                                          juce::PathStrokeType::rounded));
-        }
-
-        // --- Indicator line (amber, center → rim) ---
-        juce::Path indicator;
-        const float innerR = radius * 0.25f;
-        const float outerR = radius * 0.85f;
-        indicator.startNewSubPath(0.0f, -outerR);
-        indicator.lineTo(0.0f, -innerR);
-        g.setColour(kAmber);
-        g.strokePath(indicator,
-                     juce::PathStrokeType(2.5f, juce::PathStrokeType::curved,
-                                                juce::PathStrokeType::rounded),
-                     juce::AffineTransform::rotation(angle).translated(centre));
-    }
-
-    juce::Font getLabelFont(juce::Label& l) override
-    {
-        auto f = juce::LookAndFeel_V4::getLabelFont(l);
-        f.setHeight(11.0f);
-        return f;
-    }
-};
+namespace P = ferment::palette;
 
 // =============================================================================
 //  Editor
@@ -148,12 +66,12 @@ void FermentGlueEditor::setupKnob(KnobWithLabel& k, const char* paramID, const c
 
     k.name.setText(displayName, juce::dontSendNotification);
     k.name.setJustificationType(juce::Justification::centred);
-    k.name.setColour(juce::Label::textColourId, kLabelDim);
+    k.name.setColour(juce::Label::textColourId, P::labelDim);
     k.name.setFont(juce::Font(10.0f, juce::Font::bold));
     addAndMakeVisible(k.name);
 
     k.value.setJustificationType(juce::Justification::centred);
-    k.value.setColour(juce::Label::textColourId, kAmber);
+    k.value.setColour(juce::Label::textColourId, P::amber);
     k.value.setFont(juce::Font(11.0f));
     addAndMakeVisible(k.value);
 
@@ -173,30 +91,30 @@ void FermentGlueEditor::paint(juce::Graphics& g)
     auto b = getLocalBounds().toFloat();
 
     // --- Chassis fill with vignette ---
-    juce::ColourGradient bg(kPanel, b.getCentreX(), b.getCentreY() - 40.f,
-                            kChassis, b.getCentreX(), b.getHeight(), true);
+    juce::ColourGradient bg(P::panel, b.getCentreX(), b.getCentreY() - 40.f,
+                            P::chassis, b.getCentreX(), b.getHeight(), true);
     g.setGradientFill(bg);
     g.fillAll();
 
     // --- Outer bevel ---
-    g.setColour(kChassisEdge);
+    g.setColour(P::chassisEdge);
     g.drawRect(b, 2.0f);
-    g.setColour(kPanelHi.withAlpha(0.6f));
+    g.setColour(P::panelHi.withAlpha(0.6f));
     g.drawRect(b.reduced(2.0f), 1.0f);
 
     // --- Title stripe ---
     auto titleArea = b.removeFromTop(50.0f).reduced(12.0f, 10.0f);
-    g.setColour(kSeparator);
+    g.setColour(P::separator);
     g.drawLine(titleArea.getX(), titleArea.getBottom() + 6.0f,
                titleArea.getRight(), titleArea.getBottom() + 6.0f, 1.0f);
 
     // Brand wordmark (left)
-    g.setColour(kLabelCream);
+    g.setColour(P::labelCream);
     g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 18.0f, juce::Font::bold));
     g.drawText("FERMENT", titleArea.removeFromLeft(100), juce::Justification::left, false);
 
     // Product name (right, amber)
-    g.setColour(kAmber);
+    g.setColour(P::amber);
     g.setFont(juce::Font(14.0f, juce::Font::plain));
     g.drawText("Glue  /  SSL-style bus comp", titleArea,
                juce::Justification::right, false);

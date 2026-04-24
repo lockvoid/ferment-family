@@ -74,6 +74,14 @@ function(ferment_add_plugin TARGET_NAME PRODUCT_NAME BUNDLE_ID MFR_CODE PLUG_COD
     CLAP_FEATURES "audio-effect" "compressor" "stereo")
 endfunction()
 
+# Shared UI + DSP primitives for all Ferment plugins.
+set(FERMENT_COMMON_SOURCES
+  common/WarmLookAndFeel.cpp
+  common/WarmLookAndFeel.h
+  common/WarmPalette.h
+  common/Biquad.h
+)
+
 # ---- Ferment Glue ----
 ferment_add_plugin(
   ferment-glue
@@ -90,4 +98,24 @@ target_sources(ferment-glue PRIVATE
   glue/FermentGlueProcessor.h
   glue/FermentGlueEditor.cpp
   glue/FermentGlueEditor.h
+  ${FERMENT_COMMON_SOURCES}
+)
+
+# ---- Ferment EQ ----
+ferment_add_plugin(
+  ferment-eq
+  "Ferment EQ"
+  "com.ferment.dsp.eq"
+  Frmt
+  FmEq
+  "https://ferment.dsp/lv2/eq"
+  "com.ferment.dsp.eq"
+  eq
+)
+target_sources(ferment-eq PRIVATE
+  eq/FermentEqProcessor.cpp
+  eq/FermentEqProcessor.h
+  eq/FermentEqEditor.cpp
+  eq/FermentEqEditor.h
+  ${FERMENT_COMMON_SOURCES}
 )
