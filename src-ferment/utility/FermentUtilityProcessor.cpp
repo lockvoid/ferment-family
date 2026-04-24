@@ -62,6 +62,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout FermentUtilityProcessor::bui
         juce::ParameterID("mssolo", 1), "M/S Solo",
         juce::StringArray { "Off", "Mid", "Side" }, SoloOff));
 
+    // DC filter toggle: removes sub-5 Hz DC offset
+    layout.add(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID("dc", 1), "DC Filter", false));
+
+    // Bass Mono: below the set frequency, L and R are summed to mono
+    layout.add(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID("bassmono", 1), "Bass Mono", false));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID("bassmonofreq", 1), "Bass Mono Freq",
+        juce::NormalisableRange<float>(0.f, 1.f), 0.28f));  // ~120 Hz default
+
     return layout;
 }
 
@@ -72,7 +83,13 @@ FermentUtilityProcessor::FermentUtilityProcessor()
       apvts(*this, nullptr, "FermentUtility", buildLayout())
 {}
 
-void FermentUtilityProcessor::prepareToPlay(double, int) {}
+void FermentUtilityProcessor::prepareToPlay(double sr, int)
+{
+    sampleRate    = sr;
+    dcPrevInL = dcPrevOutL = dcPrevInR = dcPrevOutR = 0.0;
+    bmLpL = bmLpR = {};
+    bmLastFreq = -1.0;
+}
 
 bool FermentUtilityProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
@@ -100,11 +117,35 @@ void FermentUtilityProcessor::processBlockT(juce::AudioBuffer<T>& buffer)
     const double balR    = balanceFromNorm(apvts.getRawParameterValue("balR")->load());
     const double width   = widthFromNorm(apvts.getRawParameterValue("width")->load());
     const int    ms      = (int)apvts.getRawParameterValue("mssolo")->load();
+    const bool   dcOn    = apvts.getRawParameterValue("dc")->load()       >= 0.5f;
+    const bool   bmOn    = apvts.getRawParameterValue("bassmono")->load() >= 0.5f;
+    const double bmFreq  = bassMonoFromNorm(apvts.getRawParameterValue("bassmonofreq")->load());
 
     // Balance scalers — negative balance attenuates, positive keeps the level
     // (Ableton behaviour: moving L slider left silences L, right leaves it alone).
     const double balLScale = (balL >= 0.0) ? 1.0 : (1.0 + balL);   // balL in [-1..0] → scale 0..1
     const double balRScale = (balR >= 0.0) ? 1.0 : (1.0 + balR);
+
+    // DC filter coefficient — one-pole HP, R = 1 - 2*pi*f/fs, f=5 Hz
+    const double dcR = 1.0 - (2.0 * M_PI * 5.0 / sampleRate);
+
+    // Bass-mono LP coefficients (2nd-order Butterworth LP, RBJ cookbook with Q=0.707).
+    // Recompute only when the frequency changes to avoid per-sample math.
+    if (bmOn && std::fabs(bmFreq - bmLastFreq) > 0.01)
+    {
+        const double f = juce::jlimit(20.0, sampleRate * 0.49, bmFreq);
+        const double w = 2.0 * M_PI * f / sampleRate;
+        const double cosw = std::cos(w);
+        const double sinw = std::sin(w);
+        const double alpha = sinw / (2.0 * 0.707);
+        const double a0 = 1.0 + alpha;
+        bmB0 = ((1.0 - cosw) * 0.5) / a0;
+        bmB1 = (1.0 - cosw) / a0;
+        bmB2 = bmB0;
+        bmA1 = (-2.0 * cosw) / a0;
+        bmA2 = (1.0 - alpha) / a0;
+        bmLastFreq = bmFreq;
+    }
 
     auto* inBus = getBus(true, 0);
     const int numIn = inBus ? inBus->getNumberOfChannels() : 2;
@@ -150,6 +191,34 @@ void FermentUtilityProcessor::processBlockT(juce::AudioBuffer<T>& buffer)
             else if (ms == SideOnly) midS  = 0.0;
             l = midS + sideS;
             r = midS - sideS;
+        }
+
+        // --- Bass mono: split each channel into low + high, sum lows to mono ---
+        if (bmOn)
+        {
+            // LP via Transposed DF2
+            const double lowL = bmB0 * l + bmLpL.z1;
+            bmLpL.z1 = bmB1 * l - bmA1 * lowL + bmLpL.z2;
+            bmLpL.z2 = bmB2 * l - bmA2 * lowL;
+
+            const double lowR = bmB0 * r + bmLpR.z1;
+            bmLpR.z1 = bmB1 * r - bmA1 * lowR + bmLpR.z2;
+            bmLpR.z2 = bmB2 * r - bmA2 * lowR;
+
+            const double highL = l - lowL;
+            const double highR = r - lowR;
+            const double lowMono = (lowL + lowR) * 0.5;
+            l = lowMono + highL;
+            r = lowMono + highR;
+        }
+
+        // --- DC filter: one-pole HP at ~5 Hz ---
+        if (dcOn)
+        {
+            const double outL = l - dcPrevInL + dcR * dcPrevOutL;
+            dcPrevInL = l;    dcPrevOutL = outL;   l = outL;
+            const double outR = r - dcPrevInR + dcR * dcPrevOutR;
+            dcPrevInR = r;    dcPrevOutR = outR;   r = outR;
         }
 
         // --- Mute (last stage) ---

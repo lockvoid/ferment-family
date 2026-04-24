@@ -24,7 +24,7 @@ private:
         juce::Label  name, value;
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
     };
-    Knob gainK, balLK, balRK, widthK;
+    Knob gainK, balLK, balRK, widthK, bassMonoFreqK;
 
     void setupKnob(Knob& k, const char* paramId, const char* name,
                    std::function<juce::String(double)> fmt);
@@ -33,7 +33,9 @@ private:
     juce::TextButton muteBtn   { "MUTE"   };
     juce::TextButton phaseLBtn { "\u00F8 L" };
     juce::TextButton phaseRBtn { "\u00F8 R" };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> muteAtt, phaseLAtt, phaseRAtt;
+    juce::TextButton dcBtn       { "DC"     };
+    juce::TextButton bassMonoBtn { "BASS M" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> muteAtt, phaseLAtt, phaseRAtt, dcAtt, bassMonoAtt;
 
     // Channel mode as button bar (Stereo / Swap / L / R / Mono)
     std::array<juce::TextButton, 5> chanBtns;

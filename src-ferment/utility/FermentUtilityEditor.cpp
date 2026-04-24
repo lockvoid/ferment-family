@@ -28,18 +28,26 @@ FermentUtilityEditor::FermentUtilityEditor(FermentUtilityProcessor& p)
     setupKnob(widthK, "width", "WIDTH", [](double n) {
         return juce::String((int)std::round(FermentUtilityProcessor::widthFromNorm(n) * 100.0)) + "%";
     });
+    setupKnob(bassMonoFreqK, "bassmonofreq", "BASS F", [](double n) {
+        const double f = FermentUtilityProcessor::bassMonoFromNorm(n);
+        return juce::String((int)std::round(f)) + " Hz";
+    });
 
     // ---- Toggles ----
     auto toggle = [this](juce::TextButton& b, const char*) {
         b.setClickingTogglesState(true);
         addAndMakeVisible(b);
     };
-    toggle(muteBtn,   "mute");
-    toggle(phaseLBtn, "phaseL");
-    toggle(phaseRBtn, "phaseR");
-    muteAtt   = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.apvts, "mute",   muteBtn);
-    phaseLAtt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.apvts, "phaseL", phaseLBtn);
-    phaseRAtt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.apvts, "phaseR", phaseRBtn);
+    toggle(muteBtn,      "mute");
+    toggle(phaseLBtn,    "phaseL");
+    toggle(phaseRBtn,    "phaseR");
+    toggle(dcBtn,        "dc");
+    toggle(bassMonoBtn,  "bassmono");
+    muteAtt      = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.apvts, "mute",      muteBtn);
+    phaseLAtt    = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.apvts, "phaseL",    phaseLBtn);
+    phaseRAtt    = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.apvts, "phaseR",    phaseRBtn);
+    dcAtt        = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.apvts, "dc",        dcBtn);
+    bassMonoAtt  = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.apvts, "bassmono",  bassMonoBtn);
 
     // ---- Channel mode (5-button bar, driven by hidden ComboBox so we can attach) ----
     chanHidden.addItem("Stereo", 1);
@@ -88,7 +96,7 @@ FermentUtilityEditor::FermentUtilityEditor(FermentUtilityProcessor& p)
     };
     msHidden.onChange();
 
-    setSize(820, 280);
+    setSize(860, 300);
 }
 
 FermentUtilityEditor::~FermentUtilityEditor() { setLookAndFeel(nullptr); }
@@ -155,22 +163,22 @@ void FermentUtilityEditor::resized()
 {
     auto area = getLocalBounds().withTrimmedTop(60).reduced(14, 10);
 
-    // Row of knobs (Gain / Bal L / Bal R / Width)
+    // Row of knobs (Gain / Bal L / Bal R / Width / Bass Mono Freq)
     auto knobRow = area.removeFromTop(120);
-    Knob* ks[] = { &gainK, &balLK, &balRK, &widthK };
-    const int cellW = knobRow.getWidth() / 5;  // 4 knobs + 1 cell reserved for mode cluster
-    for (int i = 0; i < 4; ++i)
+    Knob* ks[] = { &gainK, &balLK, &balRK, &widthK, &bassMonoFreqK };
+    const int cellW = knobRow.getWidth() / 6;  // 5 knobs + 1 cell for toggles
+    for (int i = 0; i < 5; ++i)
     {
         auto cell = knobRow.removeFromLeft(cellW);
         ks[i]->name.setBounds(cell.removeFromTop(14));
         ks[i]->value.setBounds(cell.removeFromBottom(16));
-        ks[i]->slider.setBounds(cell.withSizeKeepingCentre(70, 70));
+        ks[i]->slider.setBounds(cell.withSizeKeepingCentre(68, 68));
     }
 
-    // Right knob-cell reserved for toggles (Phase L / Phase R / Mute stacked)
+    // Right cell: stacked toggles (Phase L / Phase R / Mute)
     {
         auto col = knobRow;
-        const int btnH = 26;
+        const int btnH = 24;
         phaseLBtn.setBounds(col.removeFromTop(btnH).reduced(4, 2));
         col.removeFromTop(2);
         phaseRBtn.setBounds(col.removeFromTop(btnH).reduced(4, 2));
@@ -180,10 +188,11 @@ void FermentUtilityEditor::resized()
 
     area.removeFromTop(6);
 
-    // Bottom bar: Channel Mode (left) + M/S Solo (right)
+    // Bottom bar: Channel Mode | M/S Solo | DC + Bass Mono
     auto barArea = area.removeFromTop(38);
-    auto chanArea = barArea.removeFromLeft(barArea.getWidth() * 5 / 8);
-    auto msArea   = barArea;
+    auto chanArea = barArea.removeFromLeft(barArea.getWidth() * 4 / 10);
+    auto msArea   = barArea.removeFromLeft(barArea.getWidth() * 3 / 6);
+    auto filtArea = barArea;
 
     {
         const int btnW = chanArea.getWidth() / 5;
@@ -191,9 +200,15 @@ void FermentUtilityEditor::resized()
             chanBtns[i].setBounds(chanArea.removeFromLeft(btnW).reduced(2));
     }
     {
-        msArea.removeFromLeft(10);
+        msArea.removeFromLeft(8);
         const int btnW = msArea.getWidth() / 3;
         for (int i = 0; i < 3; ++i)
             msBtns[i].setBounds(msArea.removeFromLeft(btnW).reduced(2));
+    }
+    {
+        filtArea.removeFromLeft(8);
+        const int btnW = filtArea.getWidth() / 2;
+        dcBtn.setBounds(filtArea.removeFromLeft(btnW).reduced(2));
+        bassMonoBtn.setBounds(filtArea.removeFromLeft(btnW).reduced(2));
     }
 }
