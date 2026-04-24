@@ -11,12 +11,16 @@ public:
     ~FermentUtilityProcessor() override = default;
 
     enum ChannelMode { Stereo = 0, Swap, LeftOnly, RightOnly, Mono, kNumModes };
+    enum MSSolo      { SoloOff = 0, MidOnly, SideOnly, kNumSolos };
 
     static const char* channelModeName(int m);
+    static const char* msSoloName(int m);
 
     // ---- ranges / display helpers ----
-    static double gainFromNorm(double v)   { return (v - 0.5) * 70.0; }       // -35 .. +35 dB
-    static double gainToNorm (double dB)   { return (dB / 70.0) + 0.5; }
+    static double gainFromNorm(double v)    { return (v - 0.5) * 70.0; }         // -35 .. +35 dB
+    static double gainToNorm (double dB)    { return (dB / 70.0) + 0.5; }
+    static double widthFromNorm(double v)   { return v * 4.0; }                  // 0 .. 400%
+    static double balanceFromNorm(double v) { return (v - 0.5) * 2.0; }          // -1 .. +1
 
     // ---- AudioProcessor ----
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;

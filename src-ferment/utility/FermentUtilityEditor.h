@@ -18,10 +18,16 @@ private:
     FermentUtilityProcessor& processor;
     std::unique_ptr<WarmLookAndFeel> lnf;
 
-    // Gain rotary + value
-    juce::Slider gain;
-    juce::Label  gainName, gainValue;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> gainAtt;
+    // Continuous rotaries
+    struct Knob {
+        juce::Slider slider;
+        juce::Label  name, value;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+    };
+    Knob gainK, balLK, balRK, widthK;
+
+    void setupKnob(Knob& k, const char* paramId, const char* name,
+                   std::function<juce::String(double)> fmt);
 
     // Boolean toggles
     juce::TextButton muteBtn   { "MUTE"   };
@@ -32,9 +38,12 @@ private:
     // Channel mode as button bar (Stereo / Swap / L / R / Mono)
     std::array<juce::TextButton, 5> chanBtns;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> chanAtt;
-    juce::ComboBox chanHidden; // attached to APVTS; buttons sync with it
+    juce::ComboBox chanHidden;
 
-    void wireChanButtons();
+    // Mid/Side solo as 3-button bar (Off / Mid / Side)
+    std::array<juce::TextButton, 3> msBtns;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> msAtt;
+    juce::ComboBox msHidden;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FermentUtilityEditor)
 };

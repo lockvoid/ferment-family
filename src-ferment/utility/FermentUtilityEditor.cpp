@@ -13,31 +13,21 @@ FermentUtilityEditor::FermentUtilityEditor(FermentUtilityProcessor& p)
     lnf = std::make_unique<WarmLookAndFeel>();
     setLookAndFeel(lnf.get());
 
-    // ---- Gain knob ----
-    gain.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    gain.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
-    gain.setRotaryParameters(juce::MathConstants<float>::pi * 1.25f,
-                              juce::MathConstants<float>::pi * 2.75f, true);
-    addAndMakeVisible(gain);
-
-    gainName.setText("GAIN", juce::dontSendNotification);
-    gainName.setJustificationType(juce::Justification::centred);
-    gainName.setColour(juce::Label::textColourId, P::labelDim);
-    gainName.setFont(juce::Font(10.0f, juce::Font::bold));
-    addAndMakeVisible(gainName);
-
-    gainValue.setJustificationType(juce::Justification::centred);
-    gainValue.setColour(juce::Label::textColourId, P::amber);
-    gainValue.setFont(juce::Font(11.0f));
-    addAndMakeVisible(gainValue);
-
-    gain.onValueChange = [this]() {
-        const double dB = FermentUtilityProcessor::gainFromNorm(gain.getValue());
-        gainValue.setText(juce::String(dB, 1) + " dB", juce::dontSendNotification);
-    };
-    gainAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, "gain", gain);
-    gain.onValueChange();
+    // ---- Continuous knobs ----
+    setupKnob(gainK, "gain", "GAIN", [](double n) {
+        return juce::String(FermentUtilityProcessor::gainFromNorm(n), 1) + " dB";
+    });
+    setupKnob(balLK, "balL", "BAL L", [](double n) {
+        const double b = FermentUtilityProcessor::balanceFromNorm(n);
+        return juce::String((int)std::round(b * 100.0));
+    });
+    setupKnob(balRK, "balR", "BAL R", [](double n) {
+        const double b = FermentUtilityProcessor::balanceFromNorm(n);
+        return juce::String((int)std::round(b * 100.0));
+    });
+    setupKnob(widthK, "width", "WIDTH", [](double n) {
+        return juce::String((int)std::round(FermentUtilityProcessor::widthFromNorm(n) * 100.0)) + "%";
+    });
 
     // ---- Toggles ----
     auto toggle = [this](juce::TextButton& b, const char*) {
@@ -76,10 +66,59 @@ FermentUtilityEditor::FermentUtilityEditor(FermentUtilityProcessor& p)
     };
     chanHidden.onChange();
 
-    setSize(640, 260);
+    // ---- Mid/Side solo bar (Off / Mid / Side) ----
+    msHidden.addItem("Off",  1);
+    msHidden.addItem("Mid",  2);
+    msHidden.addItem("Side", 3);
+    addChildComponent(msHidden);
+    const char* msLabels[] = { "OFF", "MID", "SIDE" };
+    for (int i = 0; i < 3; ++i)
+    {
+        msBtns[i].setButtonText(msLabels[i]);
+        msBtns[i].setClickingTogglesState(false);
+        msBtns[i].onClick = [this, i]() { msHidden.setSelectedItemIndex(i, juce::sendNotificationSync); };
+        addAndMakeVisible(msBtns[i]);
+    }
+    msAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        processor.apvts, "mssolo", msHidden);
+    msHidden.onChange = [this]() {
+        const int sel = msHidden.getSelectedItemIndex();
+        for (int i = 0; i < (int)msBtns.size(); ++i)
+            msBtns[i].setToggleState(i == sel, juce::dontSendNotification);
+    };
+    msHidden.onChange();
+
+    setSize(820, 280);
 }
 
 FermentUtilityEditor::~FermentUtilityEditor() { setLookAndFeel(nullptr); }
+
+void FermentUtilityEditor::setupKnob(Knob& k, const char* paramId, const char* name,
+                                      std::function<juce::String(double)> fmt)
+{
+    k.slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    k.slider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
+    k.slider.setRotaryParameters(juce::MathConstants<float>::pi * 1.25f,
+                                  juce::MathConstants<float>::pi * 2.75f, true);
+    addAndMakeVisible(k.slider);
+
+    k.name.setText(name, juce::dontSendNotification);
+    k.name.setJustificationType(juce::Justification::centred);
+    k.name.setColour(juce::Label::textColourId, P::labelDim);
+    k.name.setFont(juce::Font(10.0f, juce::Font::bold));
+    addAndMakeVisible(k.name);
+
+    k.value.setJustificationType(juce::Justification::centred);
+    k.value.setColour(juce::Label::textColourId, P::amber);
+    k.value.setFont(juce::Font(11.0f));
+    addAndMakeVisible(k.value);
+
+    auto update = [&k, fmt]() { k.value.setText(fmt(k.slider.getValue()), juce::dontSendNotification); };
+    k.slider.onValueChange = update;
+    k.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processor.apvts, paramId, k.slider);
+    update();
+}
 
 void FermentUtilityEditor::paint(juce::Graphics& g)
 {
@@ -114,31 +153,47 @@ void FermentUtilityEditor::paint(juce::Graphics& g)
 
 void FermentUtilityEditor::resized()
 {
-    auto area = getLocalBounds().withTrimmedTop(60).reduced(16, 12);
+    auto area = getLocalBounds().withTrimmedTop(60).reduced(14, 10);
 
-    // Left column: Gain knob
-    auto gainCol = area.removeFromLeft(120);
-    gainName.setBounds(gainCol.removeFromTop(14));
-    auto gainKnobArea = gainCol.removeFromTop(80).withSizeKeepingCentre(72, 72);
-    gain.setBounds(gainKnobArea);
-    gainValue.setBounds(gainCol.removeFromTop(18));
+    // Row of knobs (Gain / Bal L / Bal R / Width)
+    auto knobRow = area.removeFromTop(120);
+    Knob* ks[] = { &gainK, &balLK, &balRK, &widthK };
+    const int cellW = knobRow.getWidth() / 5;  // 4 knobs + 1 cell reserved for mode cluster
+    for (int i = 0; i < 4; ++i)
+    {
+        auto cell = knobRow.removeFromLeft(cellW);
+        ks[i]->name.setBounds(cell.removeFromTop(14));
+        ks[i]->value.setBounds(cell.removeFromBottom(16));
+        ks[i]->slider.setBounds(cell.withSizeKeepingCentre(70, 70));
+    }
 
-    area.removeFromLeft(8);
+    // Right knob-cell reserved for toggles (Phase L / Phase R / Mute stacked)
+    {
+        auto col = knobRow;
+        const int btnH = 26;
+        phaseLBtn.setBounds(col.removeFromTop(btnH).reduced(4, 2));
+        col.removeFromTop(2);
+        phaseRBtn.setBounds(col.removeFromTop(btnH).reduced(4, 2));
+        col.removeFromTop(6);
+        muteBtn.setBounds(col.removeFromTop(btnH).reduced(4, 2));
+    }
 
-    // Middle: toggles stacked (Phase L / Phase R / Mute)
-    auto toggleCol = area.removeFromLeft(80);
-    const int btnH = 30;
-    phaseLBtn.setBounds(toggleCol.removeFromTop(btnH));
-    toggleCol.removeFromTop(4);
-    phaseRBtn.setBounds(toggleCol.removeFromTop(btnH));
-    toggleCol.removeFromTop(8);
-    muteBtn.setBounds(toggleCol.removeFromTop(btnH));
+    area.removeFromTop(6);
 
-    area.removeFromLeft(12);
+    // Bottom bar: Channel Mode (left) + M/S Solo (right)
+    auto barArea = area.removeFromTop(38);
+    auto chanArea = barArea.removeFromLeft(barArea.getWidth() * 5 / 8);
+    auto msArea   = barArea;
 
-    // Right: channel mode bar
-    auto chanArea = area.removeFromTop(40);
-    const int btnW = chanArea.getWidth() / 5;
-    for (int i = 0; i < 5; ++i)
-        chanBtns[i].setBounds(chanArea.removeFromLeft(btnW).reduced(2));
+    {
+        const int btnW = chanArea.getWidth() / 5;
+        for (int i = 0; i < 5; ++i)
+            chanBtns[i].setBounds(chanArea.removeFromLeft(btnW).reduced(2));
+    }
+    {
+        msArea.removeFromLeft(10);
+        const int btnW = msArea.getWidth() / 3;
+        for (int i = 0; i < 3; ++i)
+            msBtns[i].setBounds(msArea.removeFromLeft(btnW).reduced(2));
+    }
 }
