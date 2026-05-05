@@ -80,15 +80,11 @@ FermentEqProcessor::FermentEqProcessor()
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "FermentEq", buildLayout())
 {
-    // Coefficients are recomputed every processBlock (cheap, N=8 biquads).
-    coeffsDirty = true;
 }
 
 void FermentEqProcessor::prepareToPlay(double sampleRate, int)
 {
-    currentSR = sampleRate;
-    for (auto& b : bands) b.reset();
-    coeffsDirty = true;
+    dsp.setSampleRate(static_cast<float>(sampleRate));
 }
 
 bool FermentEqProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -102,33 +98,30 @@ bool FermentEqProcessor::isBusesLayoutSupported(const BusesLayout& layouts) cons
     return inValid && outValid && sizeOk;
 }
 
-void FermentEqProcessor::recomputeCoeffs()
+void FermentEqProcessor::syncParamsToDSP()
 {
+    using namespace airwinconsolidated::FermentEq;
+
+    // APVTS choice indices come back as int-valued floats (0..N-1). The DSP
+    // stores type as 0..1 normalised. Convert on the way in.
+    const float typeScale = 1.0f / float(kNumTypes - 1);
+
     for (int b = 0; b < kNumBands; ++b)
     {
-        const bool on = apvts.getRawParameterValue(paramId(b, "on"))->load() >= 0.5f;
-        if (!on) { bands[b].setIdentity(); continue; }
+        const float typeIdx = apvts.getRawParameterValue(paramId(b, "type"))->load();
+        const float freqN   = apvts.getRawParameterValue(paramId(b, "freq"))->load();
+        const float gainN   = apvts.getRawParameterValue(paramId(b, "gain"))->load();
+        const float qN      = apvts.getRawParameterValue(paramId(b, "q"))->load();
+        const float onN     = apvts.getRawParameterValue(paramId(b, "on"))->load();
 
-        const int    type     = (int)apvts.getRawParameterValue(paramId(b, "type"))->load();
-        const double freqN    = apvts.getRawParameterValue(paramId(b, "freq"))->load();
-        const double gainN    = apvts.getRawParameterValue(paramId(b, "gain"))->load();
-        const double qN       = apvts.getRawParameterValue(paramId(b, "q"))->load();
-        const double freq     = juce::jlimit(20.0, currentSR * 0.49, freqFromNorm(freqN));
-        const double gainDb   = gainFromNorm(gainN);
-        const double q        = qFromNorm(qN);
-
-        auto& bq = bands[b];
-        switch (type)
-        {
-            case Bell:      bq.setBell(freq, q, gainDb, currentSR); break;
-            case LowShelf:  bq.setLowShelf(freq, q, gainDb, currentSR); break;
-            case HighShelf: bq.setHighShelf(freq, q, gainDb, currentSR); break;
-            case LowCut:    bq.setLowCut(freq, q, currentSR); break;
-            case HighCut:   bq.setHighCut(freq, q, currentSR); break;
-            case Notch:     bq.setNotch(freq, q, currentSR); break;
-            default:        bq.setIdentity(); break;
-        }
+        const int off = b * kBandStride;
+        dsp.setParameter(off + kBandTypeOffset, typeIdx * typeScale);
+        dsp.setParameter(off + kBandFreqOffset, freqN);
+        dsp.setParameter(off + kBandGainOffset, gainN);
+        dsp.setParameter(off + kBandQOffset,    qN);
+        dsp.setParameter(off + kBandOnOffset,   onN);
     }
+    dsp.setParameter(kParamOutput, apvts.getRawParameterValue("output")->load());
 }
 
 template <typename T>
@@ -136,34 +129,21 @@ void FermentEqProcessor::processBlockT(juce::AudioBuffer<T>& buffer)
 {
     juce::ScopedNoDenormals noDenormals;
 
-    // Cheap check; params are atomics — just recompute every block for now.
-    recomputeCoeffs();
-
-    const double outLin = std::pow(10.0, outputFromNorm(apvts.getRawParameterValue("output")->load()) / 20.0);
+    syncParamsToDSP();
 
     auto* inBus = getBus(true, 0);
     const int numIn = inBus ? inBus->getNumberOfChannels() : 2;
     const int numSamples = buffer.getNumSamples();
 
     T* L = buffer.getWritePointer(0);
-    T* R = (numIn >= 2) ? buffer.getWritePointer(1) : nullptr;
+    T* R = (numIn >= 2) ? buffer.getWritePointer(1) : L;  // mono: alias L
 
-    for (int n = 0; n < numSamples; ++n)
-    {
-        double l = (double)L[n];
-        double r = (R != nullptr) ? (double)R[n] : l;
-
-        for (auto& b : bands)
-        {
-            l = b.processL(l);
-            r = b.processR(r);
-        }
-
-        l *= outLin;
-        r *= outLin;
-
-        L[n] = (T)l;
-        if (R) R[n] = (T)r;
+    T* in[2]  = { L, R };
+    T* out[2] = { L, R };
+    if constexpr (std::is_same_v<T, float>) {
+        dsp.processReplacing(in, out, numSamples);
+    } else {
+        dsp.processDoubleReplacing(in, out, numSamples);
     }
 }
 

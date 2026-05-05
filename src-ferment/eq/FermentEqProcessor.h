@@ -1,7 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
-#include "../common/Biquad.h"
+#include "FermentEq.h"
 
 // Ferment EQ — 8-band parametric equalizer.  Each band has a type selector
 // (Bell / LoShelf / HiShelf / LoCut / HiCut / Notch), frequency, gain, Q,
@@ -63,16 +63,15 @@ public:
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout buildLayout();
 
-    // Per-band coefficients (shared L+R since we recompute every block).
-    ferment::Biquad bands[kNumBands];
-
-    double currentSR = 48000.0;
-    std::atomic<bool> coeffsDirty { true };
+    // Pure-C++ DSP (Airwindows-style, embeddable in non-JUCE hosts like the
+    // iOS pipeline). The JUCE wrapper only handles param routing + buffers.
+    airwinconsolidated::FermentEq::FermentEq dsp { 0 };
 
     template <typename T>
     void processBlockT(juce::AudioBuffer<T>& buffer);
 
-    void recomputeCoeffs();
+    // Pump APVTS atomics into the DSP's parameter array. Called once per block.
+    void syncParamsToDSP();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FermentEqProcessor)
 };

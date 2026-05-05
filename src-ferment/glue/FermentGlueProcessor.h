@@ -2,9 +2,11 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-namespace airwinconsolidated::GlueBlue { class GlueBlue; }
+namespace airwinconsolidated::FermentGlue { class FermentGlue; }
 
-// Standalone JUCE plugin wrapping the GlueBlue DSP with a warm-analog UI.
+// Standalone JUCE plugin wrapping the Ferment-owned FermentGlue DSP with a
+// warm-analog UI. The DSP is a verbatim copy of Airwindows GlueBlue; we own
+// it under our namespace so it can ship in non-airwindows hosts (iOS).
 // No dropdown selector, no help text — single-purpose pro tool.
 class FermentGlueProcessor : public juce::AudioProcessor
 {
@@ -45,7 +47,7 @@ public:
     juce::AudioProcessorValueTreeState apvts;
 
 private:
-    std::unique_ptr<airwinconsolidated::GlueBlue::GlueBlue> dsp;
+    std::unique_ptr<airwinconsolidated::FermentGlue::FermentGlue> dsp;
 
     template <typename T>
     struct Scratch

@@ -1,9 +1,9 @@
 #include "FermentGlueProcessor.h"
 #include "FermentGlueEditor.h"
 
-#include "../../src/autogen_airwin/GlueBlue.h"
+#include "FermentGlue.h"
 
-namespace GB = airwinconsolidated::GlueBlue;
+namespace GB = airwinconsolidated::FermentGlue;
 
 juce::AudioProcessorValueTreeState::ParameterLayout
 FermentGlueProcessor::buildLayout()
@@ -37,7 +37,7 @@ FermentGlueProcessor::FermentGlueProcessor()
                          .withOutput("Output",   juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "FermentGlue", buildLayout())
 {
-    dsp = std::make_unique<GB::GlueBlue>(0);
+    dsp = std::make_unique<GB::FermentGlue>(0);
 }
 
 FermentGlueProcessor::~FermentGlueProcessor() = default;

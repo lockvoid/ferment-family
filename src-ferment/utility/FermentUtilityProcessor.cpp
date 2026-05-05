@@ -85,10 +85,7 @@ FermentUtilityProcessor::FermentUtilityProcessor()
 
 void FermentUtilityProcessor::prepareToPlay(double sr, int)
 {
-    sampleRate    = sr;
-    dcPrevInL = dcPrevOutL = dcPrevInR = dcPrevOutR = 0.0;
-    bmLpL = bmLpR = {};
-    bmLastFreq = -1.0;
+    dsp.setSampleRate(static_cast<float>(sr));
 }
 
 bool FermentUtilityProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -102,130 +99,45 @@ bool FermentUtilityProcessor::isBusesLayoutSupported(const BusesLayout& layouts)
     return inValid && outValid && sizeOk;
 }
 
+void FermentUtilityProcessor::syncParamsToDSP()
+{
+    using namespace airwinconsolidated::FermentUtility;
+    const float chanScale = 1.0f / float(kNumChannelModes - 1);
+    const float msScale   = 1.0f / float(kNumMSSolo - 1);
+
+    dsp.setParameter(kParamGain,         apvts.getRawParameterValue("gain")->load());
+    dsp.setParameter(kParamMute,         apvts.getRawParameterValue("mute")->load());
+    dsp.setParameter(kParamPhaseL,       apvts.getRawParameterValue("phaseL")->load());
+    dsp.setParameter(kParamPhaseR,       apvts.getRawParameterValue("phaseR")->load());
+    dsp.setParameter(kParamChannelMode,  apvts.getRawParameterValue("chanmode")->load() * chanScale);
+    dsp.setParameter(kParamBalanceL,     apvts.getRawParameterValue("balL")->load());
+    dsp.setParameter(kParamBalanceR,     apvts.getRawParameterValue("balR")->load());
+    dsp.setParameter(kParamWidth,        apvts.getRawParameterValue("width")->load());
+    dsp.setParameter(kParamMSSolo,       apvts.getRawParameterValue("mssolo")->load() * msScale);
+    dsp.setParameter(kParamDC,           apvts.getRawParameterValue("dc")->load());
+    dsp.setParameter(kParamBassMono,     apvts.getRawParameterValue("bassmono")->load());
+    dsp.setParameter(kParamBassMonoFreq, apvts.getRawParameterValue("bassmonofreq")->load());
+}
+
 template <typename T>
 void FermentUtilityProcessor::processBlockT(juce::AudioBuffer<T>& buffer)
 {
     juce::ScopedNoDenormals noDenormals;
-
-    const double gainDb  = gainFromNorm(apvts.getRawParameterValue("gain")->load());
-    const double gainLin = std::pow(10.0, gainDb / 20.0);
-    const bool   mute    = apvts.getRawParameterValue("mute")->load()   >= 0.5f;
-    const bool   phaseL  = apvts.getRawParameterValue("phaseL")->load() >= 0.5f;
-    const bool   phaseR  = apvts.getRawParameterValue("phaseR")->load() >= 0.5f;
-    const int    mode    = (int)apvts.getRawParameterValue("chanmode")->load();
-    const double balL    = balanceFromNorm(apvts.getRawParameterValue("balL")->load());
-    const double balR    = balanceFromNorm(apvts.getRawParameterValue("balR")->load());
-    const double width   = widthFromNorm(apvts.getRawParameterValue("width")->load());
-    const int    ms      = (int)apvts.getRawParameterValue("mssolo")->load();
-    const bool   dcOn    = apvts.getRawParameterValue("dc")->load()       >= 0.5f;
-    const bool   bmOn    = apvts.getRawParameterValue("bassmono")->load() >= 0.5f;
-    const double bmFreq  = bassMonoFromNorm(apvts.getRawParameterValue("bassmonofreq")->load());
-
-    // Balance scalers — negative balance attenuates, positive keeps the level
-    // (Ableton behaviour: moving L slider left silences L, right leaves it alone).
-    const double balLScale = (balL >= 0.0) ? 1.0 : (1.0 + balL);   // balL in [-1..0] → scale 0..1
-    const double balRScale = (balR >= 0.0) ? 1.0 : (1.0 + balR);
-
-    // DC filter coefficient — one-pole HP, R = 1 - 2*pi*f/fs, f=5 Hz
-    const double dcR = 1.0 - (2.0 * M_PI * 5.0 / sampleRate);
-
-    // Bass-mono LP coefficients (2nd-order Butterworth LP, RBJ cookbook with Q=0.707).
-    // Recompute only when the frequency changes to avoid per-sample math.
-    if (bmOn && std::fabs(bmFreq - bmLastFreq) > 0.01)
-    {
-        const double f = juce::jlimit(20.0, sampleRate * 0.49, bmFreq);
-        const double w = 2.0 * M_PI * f / sampleRate;
-        const double cosw = std::cos(w);
-        const double sinw = std::sin(w);
-        const double alpha = sinw / (2.0 * 0.707);
-        const double a0 = 1.0 + alpha;
-        bmB0 = ((1.0 - cosw) * 0.5) / a0;
-        bmB1 = (1.0 - cosw) / a0;
-        bmB2 = bmB0;
-        bmA1 = (-2.0 * cosw) / a0;
-        bmA2 = (1.0 - alpha) / a0;
-        bmLastFreq = bmFreq;
-    }
+    syncParamsToDSP();
 
     auto* inBus = getBus(true, 0);
     const int numIn = inBus ? inBus->getNumberOfChannels() : 2;
     const int numSamples = buffer.getNumSamples();
 
     T* L = buffer.getWritePointer(0);
-    T* R = (numIn >= 2) ? buffer.getWritePointer(1) : nullptr;
+    T* R = (numIn >= 2) ? buffer.getWritePointer(1) : L;  // mono: alias L
 
-    for (int n = 0; n < numSamples; ++n)
-    {
-        double l = (double)L[n];
-        double r = (R != nullptr) ? (double)R[n] : l;
-
-        // --- Phase invert ---
-        if (phaseL) l = -l;
-        if (phaseR) r = -r;
-
-        // --- Gain ---
-        l *= gainLin;
-        r *= gainLin;
-
-        // --- Channel mode routing ---
-        switch (mode)
-        {
-            case Swap:      std::swap(l, r); break;
-            case LeftOnly:  r = l; break;
-            case RightOnly: l = r; break;
-            case Mono:      { const double m = (l + r) * 0.5; l = m; r = m; break; }
-            case Stereo:
-            default:        break;
-        }
-
-        // --- Per-channel balance (attenuation-only model) ---
-        l *= balLScale;
-        r *= balRScale;
-
-        // --- Width + Mid/Side solo via M/S encode ---
-        {
-            double midS  = (l + r) * 0.5;
-            double sideS = (l - r) * 0.5;
-            sideS *= width;
-            if      (ms == MidOnly)  sideS = 0.0;
-            else if (ms == SideOnly) midS  = 0.0;
-            l = midS + sideS;
-            r = midS - sideS;
-        }
-
-        // --- Bass mono: split each channel into low + high, sum lows to mono ---
-        if (bmOn)
-        {
-            // LP via Transposed DF2
-            const double lowL = bmB0 * l + bmLpL.z1;
-            bmLpL.z1 = bmB1 * l - bmA1 * lowL + bmLpL.z2;
-            bmLpL.z2 = bmB2 * l - bmA2 * lowL;
-
-            const double lowR = bmB0 * r + bmLpR.z1;
-            bmLpR.z1 = bmB1 * r - bmA1 * lowR + bmLpR.z2;
-            bmLpR.z2 = bmB2 * r - bmA2 * lowR;
-
-            const double highL = l - lowL;
-            const double highR = r - lowR;
-            const double lowMono = (lowL + lowR) * 0.5;
-            l = lowMono + highL;
-            r = lowMono + highR;
-        }
-
-        // --- DC filter: one-pole HP at ~5 Hz ---
-        if (dcOn)
-        {
-            const double outL = l - dcPrevInL + dcR * dcPrevOutL;
-            dcPrevInL = l;    dcPrevOutL = outL;   l = outL;
-            const double outR = r - dcPrevInR + dcR * dcPrevOutR;
-            dcPrevInR = r;    dcPrevOutR = outR;   r = outR;
-        }
-
-        // --- Mute (last stage) ---
-        if (mute) { l = 0.0; r = 0.0; }
-
-        L[n] = (T)l;
-        if (R) R[n] = (T)r;
+    T* in[2]  = { L, R };
+    T* out[2] = { L, R };
+    if constexpr (std::is_same_v<T, float>) {
+        dsp.processReplacing(in, out, numSamples);
+    } else {
+        dsp.processDoubleReplacing(in, out, numSamples);
     }
 }
 

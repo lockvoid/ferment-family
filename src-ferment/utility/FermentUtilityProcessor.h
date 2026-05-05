@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "FermentUtility.h"
 
 // Ferment Utility — clone of Ableton's Utility plugin.
 // Routing, gain, phase, stereo field, DC filter, bass mono.
@@ -57,17 +58,10 @@ private:
     template <typename T>
     void processBlockT(juce::AudioBuffer<T>& buffer);
 
-    // Filter state
-    double sampleRate    { 48000.0 };
-    // DC filter: one-pole HP at ~5 Hz, per-channel state
-    double dcPrevInL     { 0.0 }, dcPrevOutL { 0.0 };
-    double dcPrevInR     { 0.0 }, dcPrevOutR { 0.0 };
-    // Bass-mono crossover: 2nd-order Butterworth LP, per channel.
-    // High band is reconstructed as (input − low), which gives perfect sum.
-    struct LpState { double z1 = 0.0, z2 = 0.0; };
-    LpState bmLpL, bmLpR;
-    double  bmB0 = 1.0, bmB1 = 0.0, bmB2 = 0.0, bmA1 = 0.0, bmA2 = 0.0;
-    double  bmLastFreq { -1.0 };
+    void syncParamsToDSP();
+
+    // Pure-C++ DSP — also linked into the iOS pipeline as a standalone class.
+    airwinconsolidated::FermentUtility::FermentUtility dsp { 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FermentUtilityProcessor)
 };
