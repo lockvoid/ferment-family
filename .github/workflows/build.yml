@@ -1,0 +1,56 @@
+name: build
+
+on:
+  push:
+    branches: [ main, master, dual-layer-port ]
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure (universal)
+        run: >
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          -DCOPY_PLUGIN_AFTER_BUILD=FALSE
+      - name: Build
+        run: cmake --build build -j 3
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Package (unsigned)
+        run: >
+          FERMENT_ARCH=universal bash scripts/installer_mac/make_ferment_installer.sh
+          "${GITHUB_REF_NAME#v}" build dist scripts/installer_mac/resources
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal-dmg
+          path: dist/*.dmg
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCOPY_PLUGIN_AFTER_BUILD=FALSE
+      - name: Build
+        run: cmake --build build --config Release -j 3
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Package VST3 zip
+        shell: pwsh
+        run: |
+          $ver = "${env:GITHUB_REF_NAME}" -replace '^v',''
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $out = "dist/ferment-family-$ver-windows-x64"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          Get-ChildItem -Recurse -Directory build/src-ferment -Filter "*.vst3" |
+            Where-Object { $_.FullName -match "Release" } |
+            ForEach-Object { Copy-Item -Recurse $_.FullName $out }
+          Compress-Archive -Path $out -DestinationPath "$out.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-vst3
+          path: dist/*.zip
