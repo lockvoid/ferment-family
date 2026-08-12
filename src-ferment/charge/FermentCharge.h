@@ -96,6 +96,11 @@ public:
         return i;
     }
 
+    // Gain reduction currently applied (dB, >= 0); for the editor's needle.
+    // The greater of the two lanes, so the reading means the same thing in
+    // every stereo mode.  Read-only, mirroring FermentLimit/FermentGlue.
+    double meterGrDb() const noexcept { return envA > envB ? envA : envB; }
+
 private:
     float p[kNumParameters];
 

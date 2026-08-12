@@ -2,11 +2,12 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-#include <array>
-#include <functional>
+#include <ferment_ui/ferment_ui.h>
+
+#include <memory>
+#include <vector>
 
 class FermentChargeProcessor;
-class WarmLookAndFeel;
 
 class FermentChargeEditor : public juce::AudioProcessorEditor
 {
@@ -18,22 +19,16 @@ public:
     void resized() override;
 
 private:
+    void addKnob(const char* paramID, const char* caption,
+                 ferment::FermentKnob::Formatter formatter);
+
     FermentChargeProcessor& processor;
 
-    std::unique_ptr<WarmLookAndFeel> lnf;
+    ferment::ChassisPanel chassis;
+    ferment::HeaderBar    header { "CHARGE / HIGH OCTANE LEVELLING COMPRESSOR" };
+    ferment::NeedleMeter  grMeter;
 
-    struct KnobWithLabel
-    {
-        juce::Slider slider;
-        juce::Label  name;
-        juce::Label  value;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
-    };
-
-    std::array<KnobWithLabel, 14> knobs;
-
-    void setupKnob(KnobWithLabel& k, const char* paramID, const char* displayName,
-                   std::function<juce::String(double)> displayFn);
+    std::vector<std::unique_ptr<ferment::FermentKnob>> knobs;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FermentChargeEditor)
 };

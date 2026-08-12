@@ -80,6 +80,14 @@ FermentEqProcessor::FermentEqProcessor()
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "FermentEq", buildLayout())
 {
+    // Resolve every parameter atomic once, off the audio thread: the
+    // per-block sync reads these pointers only (review finding §6.2).
+    static const char* const kSuffixes[5] = { "type", "freq", "gain", "q", "on" };
+    rawParams.reserve((size_t)kNumBands * 5 + 1);
+    for (int b = 0; b < kNumBands; ++b)
+        for (const char* s : kSuffixes)
+            rawParams.push_back(apvts.getRawParameterValue(paramId(b, s)));
+    rawParams.push_back(apvts.getRawParameterValue("output"));
 }
 
 void FermentEqProcessor::prepareToPlay(double sampleRate, int)
@@ -102,26 +110,25 @@ void FermentEqProcessor::syncParamsToDSP()
 {
     using namespace airwinconsolidated::FermentEq;
 
+    // Runs on the audio thread: only the atomics cached by the constructor
+    // are read here. Building the 41 paramId strings per block allocated
+    // ~160 times per callback (review finding §6.2).
+
     // APVTS choice indices come back as int-valued floats (0..N-1). The DSP
     // stores type as 0..1 normalised. Convert on the way in.
     const float typeScale = 1.0f / float(kNumTypes - 1);
 
     for (int b = 0; b < kNumBands; ++b)
     {
-        const float typeIdx = apvts.getRawParameterValue(paramId(b, "type"))->load();
-        const float freqN   = apvts.getRawParameterValue(paramId(b, "freq"))->load();
-        const float gainN   = apvts.getRawParameterValue(paramId(b, "gain"))->load();
-        const float qN      = apvts.getRawParameterValue(paramId(b, "q"))->load();
-        const float onN     = apvts.getRawParameterValue(paramId(b, "on"))->load();
-
+        const auto* r = &rawParams[(size_t)b * 5];
         const int off = b * kBandStride;
-        dsp.setParameter(off + kBandTypeOffset, typeIdx * typeScale);
-        dsp.setParameter(off + kBandFreqOffset, freqN);
-        dsp.setParameter(off + kBandGainOffset, gainN);
-        dsp.setParameter(off + kBandQOffset,    qN);
-        dsp.setParameter(off + kBandOnOffset,   onN);
+        dsp.setParameter(off + kBandTypeOffset, r[0]->load() * typeScale);
+        dsp.setParameter(off + kBandFreqOffset, r[1]->load());
+        dsp.setParameter(off + kBandGainOffset, r[2]->load());
+        dsp.setParameter(off + kBandQOffset,    r[3]->load());
+        dsp.setParameter(off + kBandOnOffset,   r[4]->load());
     }
-    dsp.setParameter(kParamOutput, apvts.getRawParameterValue("output")->load());
+    dsp.setParameter(kParamOutput, rawParams.back()->load());
 }
 
 template <typename T>
@@ -145,6 +152,52 @@ void FermentEqProcessor::processBlockT(juce::AudioBuffer<T>& buffer)
     } else {
         dsp.processDoubleReplacing(in, out, numSamples);
     }
+
+    // Only the channels the DSP actually wrote: with a mono input into a stereo
+    // bus, R aliases L and buffer channel 1 is whatever the host left there, so
+    // summing it would drag the analyser's level around for no reason.
+    pushSpectrum(buffer, numIn >= 2 ? 2 : 1);
+}
+
+// Audio thread: mono-sums the post-EQ block into the editor's FIFO.  Writes
+// only what fits, so a closed or slow editor can never stall processing.
+template <typename T>
+void FermentEqProcessor::pushSpectrum(const juce::AudioBuffer<T>& buffer, int channels) noexcept
+{
+    const int numSamples = buffer.getNumSamples();
+    const int numCh      = juce::jlimit(1, juce::jmax(1, buffer.getNumChannels()), channels);
+
+    const auto scope = spectrumFifo.write(numSamples);
+
+    auto fill = [&](int startIndex, int blockSize, int offset)
+    {
+        for (int i = 0; i < blockSize; ++i)
+        {
+            double sum = 0.0;
+            for (int ch = 0; ch < numCh; ++ch)
+                sum += (double) buffer.getReadPointer(ch)[offset + i];
+
+            spectrumBuffer[(size_t) (startIndex + i)] = (float) (sum / (double) numCh);
+        }
+    };
+
+    fill(scope.startIndex1, scope.blockSize1, 0);
+    fill(scope.startIndex2, scope.blockSize2, scope.blockSize1);
+}
+
+int FermentEqProcessor::readSpectrumSamples(float* dest, int maxSamples)
+{
+    const auto scope = spectrumFifo.read(juce::jmin(maxSamples, spectrumFifo.getNumReady()));
+
+    if (scope.blockSize1 > 0)
+        std::memcpy(dest, spectrumBuffer.data() + scope.startIndex1,
+                    (size_t) scope.blockSize1 * sizeof(float));
+
+    if (scope.blockSize2 > 0)
+        std::memcpy(dest + scope.blockSize1, spectrumBuffer.data() + scope.startIndex2,
+                    (size_t) scope.blockSize2 * sizeof(float));
+
+    return scope.blockSize1 + scope.blockSize2;
 }
 
 void FermentEqProcessor::processBlock(juce::AudioBuffer<float>&  buffer, juce::MidiBuffer&) { processBlockT(buffer); }

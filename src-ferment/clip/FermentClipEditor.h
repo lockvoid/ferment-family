@@ -2,11 +2,12 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-#include <array>
-#include <functional>
+#include <ferment_ui/ferment_ui.h>
+
+#include <memory>
+#include <vector>
 
 class FermentClipProcessor;
-class WarmLookAndFeel;
 
 class FermentClipEditor : public juce::AudioProcessorEditor,
                           private juce::Timer
@@ -21,24 +22,18 @@ public:
 private:
     void timerCallback() override;
 
+    void addKnob(const char* paramID, const char* caption,
+                 ferment::FermentKnob::Formatter formatter);
+
     FermentClipProcessor& processor;
 
-    std::unique_ptr<WarmLookAndFeel> lnf;
+    ferment::ChassisPanel chassis;
+    ferment::HeaderBar    header { "CLIP / ADAA MASTERING CLIPPER" };
 
-    struct KnobWithLabel
-    {
-        juce::Slider slider;
-        juce::Label  name;
-        juce::Label  value;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
-    };
+    std::vector<std::unique_ptr<ferment::FermentKnob>> knobs;
 
-    std::array<KnobWithLabel, 9> knobs;
     juce::Label shaveMeter;
     double shaveHold = 0.0;
-
-    void setupKnob(KnobWithLabel& k, const char* paramID, const char* displayName,
-                   std::function<juce::String(double)> displayFn);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FermentClipEditor)
 };

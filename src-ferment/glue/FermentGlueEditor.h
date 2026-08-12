@@ -2,8 +2,12 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include <ferment_ui/ferment_ui.h>
+
+#include <memory>
+#include <vector>
+
 class FermentGlueProcessor;
-class WarmLookAndFeel;
 
 class FermentGlueEditor : public juce::AudioProcessorEditor
 {
@@ -15,22 +19,16 @@ public:
     void resized() override;
 
 private:
+    void addKnob(const char* paramID, const char* caption,
+                 ferment::FermentKnob::Formatter formatter);
+
     FermentGlueProcessor& processor;
 
-    std::unique_ptr<WarmLookAndFeel> lnf;
+    ferment::ChassisPanel chassis;
+    ferment::HeaderBar    header { "GLUE / SSL-STYLE BUS COMP" };
+    ferment::NeedleMeter  grMeter;
 
-    struct KnobWithLabel
-    {
-        juce::Slider slider;
-        juce::Label  name;
-        juce::Label  value;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
-    };
-
-    std::array<KnobWithLabel, 10> knobs;
-
-    void setupKnob(KnobWithLabel& k, const char* paramID, const char* displayName,
-                   std::function<juce::String(double)> displayFn);
+    std::vector<std::unique_ptr<ferment::FermentKnob>> knobs;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FermentGlueEditor)
 };

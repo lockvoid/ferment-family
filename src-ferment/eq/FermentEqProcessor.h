@@ -3,6 +3,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "FermentEq.h"
 
+#include <array>
+
 // Ferment EQ — 8-band parametric equalizer.  Each band has a type selector
 // (Bell / LoShelf / HiShelf / LoCut / HiCut / Notch), frequency, gain, Q,
 // and an enable toggle.  RBJ biquad cookbook under the hood.
@@ -60,8 +62,28 @@ public:
     struct BandSnapshot { int type; double freq; double gain; double q; bool enabled; };
     BandSnapshot snapshot(int band) const;
 
+    /** Drains post-EQ mono samples for the editor's spectrum underlay and
+        returns how many were read.  Lock-free and allocation-free on both
+        sides: the audio thread drops samples rather than wait when no editor
+        is draining them. */
+    int readSpectrumSamples(float* dest, int maxSamples);
+
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout buildLayout();
+
+    // Parameter atomics resolved once in the constructor; band-major, 5 per
+    // band (type/freq/gain/q/on), then the output trim last. The audio-thread
+    // sync reads through these — never through paramId() string building.
+    std::vector<std::atomic<float>*> rawParams;
+
+    // ~340 ms at 48 kHz — deep enough that an editor polling at 30 Hz never
+    // starves, small enough to stay in cache.
+    static constexpr int kSpectrumFifoSize = 1 << 14;
+    juce::AbstractFifo spectrumFifo { kSpectrumFifoSize };
+    std::array<float, (size_t) kSpectrumFifoSize> spectrumBuffer {};
+
+    template <typename T>
+    void pushSpectrum(const juce::AudioBuffer<T>& buffer, int channels) noexcept;
 
     // Pure-C++ DSP (Airwindows-style, embeddable in non-JUCE hosts like the
     // iOS pipeline). The JUCE wrapper only handles param routing + buffers.

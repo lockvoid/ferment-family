@@ -42,6 +42,11 @@ FermentGlueProcessor::FermentGlueProcessor()
 
 FermentGlueProcessor::~FermentGlueProcessor() = default;
 
+double FermentGlueProcessor::meterGrDb() const noexcept
+{
+    return dsp ? dsp->meterGrDb() : 0.0;
+}
+
 template <typename T>
 void FermentGlueProcessor::Scratch<T>::prepare(int samplesPerBlock)
 {

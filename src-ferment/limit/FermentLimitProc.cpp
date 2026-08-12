@@ -87,7 +87,10 @@ void FermentLimit::designTp()
 
 void FermentLimit::reset() noexcept
 {
-    double sr = getSampleRate();
+    // Read the member, not getSampleRate(): the constructor calls reset()
+    // before any host has set a rate, and the accessor asserts on that in
+    // Debug builds. The < 8000 fallback covers the unset case either way.
+    double sr = (double)sampleRate;
     if (sr < 8000.0) sr = 48000.0;
     cachedSr = sr;
 

@@ -45,6 +45,9 @@ public:
 
     static const char* const* paramIDs();
 
+    // Gain reduction in the most recent block (dB, >= 0), for the editor's meter.
+    double meterGrDb() const noexcept;
+
     juce::AudioProcessorValueTreeState apvts;
 
 private:

@@ -2,11 +2,12 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-#include <array>
-#include <functional>
+#include <ferment_ui/ferment_ui.h>
+
+#include <memory>
+#include <vector>
 
 class FermentLimitProcessor;
-class WarmLookAndFeel;
 
 class FermentLimitEditor : public juce::AudioProcessorEditor,
                            private juce::Timer
@@ -21,24 +22,18 @@ public:
 private:
     void timerCallback() override;
 
+    void addKnob(const char* paramID, const char* caption,
+                 ferment::FermentKnob::Formatter formatter);
+
     FermentLimitProcessor& processor;
 
-    std::unique_ptr<WarmLookAndFeel> lnf;
+    ferment::ChassisPanel chassis;
+    ferment::HeaderBar    header { "LIMIT / DUAL-STAGE TRUE-PEAK LIMITER" };
 
-    struct KnobWithLabel
-    {
-        juce::Slider slider;
-        juce::Label  name;
-        juce::Label  value;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
-    };
+    std::vector<std::unique_ptr<ferment::FermentKnob>> knobs;
 
-    std::array<KnobWithLabel, 8> knobs;
     juce::Label grMeter;
     double grHold = 0.0;
-
-    void setupKnob(KnobWithLabel& k, const char* paramID, const char* displayName,
-                   std::function<juce::String(double)> displayFn);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FermentLimitEditor)
 };

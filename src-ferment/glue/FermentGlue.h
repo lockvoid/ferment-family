@@ -60,6 +60,10 @@ public:
     virtual bool canConvertParameterTextToValue(VstInt32 index);
     virtual VstInt32 canDo(char *text);
 
+    // Gain reduction in the most recent block (dB, >= 0); for the editor's
+    // needle.  Read-only accessor, mirroring FermentLimit::meterGrDb().
+    double meterGrDb() const noexcept { return envGR; }
+
 private:
     char _programName[kVstMaxProgNameLen + 1];
     std::set<std::string> _canDo;

@@ -58,6 +58,11 @@ FermentChargeProcessor::FermentChargeProcessor()
 
 FermentChargeProcessor::~FermentChargeProcessor() = default;
 
+double FermentChargeProcessor::meterGrDb() const noexcept
+{
+    return dsp ? dsp->meterGrDb() : 0.0;
+}
+
 template <typename T>
 void FermentChargeProcessor::Scratch<T>::prepare(int samplesPerBlock)
 {
