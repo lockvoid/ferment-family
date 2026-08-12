@@ -114,8 +114,12 @@ done
   echo '</installer-gui-script>'
 } > "$TMPDIR/distribution.xml"
 
-# Combine sub-pkgs into unified product pkg
-OUT_BASE="ferment-family-macOS-$VERSION"
+# Combine sub-pkgs into unified product pkg.
+# Artifact naming: <name>-<version>-<os>-<arch>, all lowercase.
+# arm64 on Apple Silicon builds, x86_64 on Intel; FERMENT_ARCH=universal
+# overrides when CMAKE_OSX_ARCHITECTURES builds both.
+ARCH="${FERMENT_ARCH:-$(uname -m)}"
+OUT_BASE="ferment-family-$VERSION-macos-$ARCH"
 pushd "$TMPDIR" > /dev/null
 
 if [ -n "${MAC_INSTALLING_CERT:-}" ]; then
