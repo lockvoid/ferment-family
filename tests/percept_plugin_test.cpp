@@ -1039,8 +1039,11 @@ int main()
 {
     juce::ScopedJuceInitialiser_GUI juceInit;
 
-    // Line buffered: a suite that hangs should still have said where it got to.
-    std::setvbuf (stdout, nullptr, _IOLBF, 0);
+    /*  Line buffered, so a suite that hangs has still said where it got to.
+        The size must be a real one: Windows' CRT treats 0 as an invalid
+        parameter and fail-fasts the process (0xc0000409) before main's first
+        printf — which looked exactly like a memory bug and wasn't.  */
+    std::setvbuf (stdout, nullptr, _IOLBF, BUFSIZ);
 
     std::printf ("Ferment Percept plugin tests\n\n");
 
