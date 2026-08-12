@@ -49,6 +49,25 @@ enum {
     kNumParameters
 };
 
+// Frozen param ABI: downstream pipelines (and the Cuts iOS vendor copy)
+// address parameters by index as kParamA.. — indices never reorder, new
+// parameters append only.
+enum {
+    kParamA = kParamGain,
+    kParamB = kParamMute,
+    kParamC = kParamPhaseL,
+    kParamD = kParamPhaseR,
+    kParamE = kParamChannelMode,
+    kParamF = kParamBalanceL,
+    kParamG = kParamBalanceR,
+    kParamH = kParamWidth,
+    kParamI = kParamMSSolo,
+    kParamJ = kParamDC,
+    kParamK = kParamBassMono,
+    kParamL = kParamBassMonoFreq
+};
+
+
 enum ChannelMode { ModeStereo = 0, ModeSwap, ModeLeftOnly, ModeRightOnly, ModeMono, kNumChannelModes };
 enum MSSolo      { SoloOff = 0, MidOnly, SideOnly, kNumMSSolo };
 

@@ -50,6 +50,27 @@ enum {
     kNumParameters
 };
 
+// Frozen param ABI: downstream pipelines (and the Cuts iOS vendor copy)
+// address parameters by index as kParamA.. — indices never reorder, new
+// parameters append only.
+enum {
+    kParamA = kParamInput,
+    kParamB = kParamCompression,
+    kParamC = kParamAttack,
+    kParamD = kParamRelease,
+    kParamE = kParamSaturation,
+    kParamF = kParamSatMode,
+    kParamG = kParamCharacter,
+    kParamH = kParamCharMode,
+    kParamI = kParamDetectorHP,
+    kParamJ = kParamStereoMode,
+    kParamK = kParamSidechain,
+    kParamL = kParamScGain,
+    kParamM = kParamMix,
+    kParamN = kParamOutput
+};
+
+
 enum SatMode    { SatMild = 0, SatModerate, SatHot, kNumSatModes };
 enum CharMode   { CharFat = 0, CharWarm, CharBright, kNumCharModes };
 enum DetectorHP { HpOff = 0, Hp100, Hp300, kNumDetectorHP };

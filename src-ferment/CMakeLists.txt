@@ -67,7 +67,7 @@ function(ferment_add_plugin TARGET_NAME PRODUCT_NAME BUNDLE_ID MFR_CODE PLUG_COD
   )
 
   target_link_libraries(${TARGET_NAME} PRIVATE
-    airwin-registry
+    ferment-base
     ferment::ferment_ui
     juce::juce_audio_utils
     juce::juce_audio_processors
@@ -283,7 +283,7 @@ add_executable(ferment_editor_shots
   ${FERMENT_ALL_EDITOR_SOURCES}
 )
 target_link_libraries(ferment_editor_shots PRIVATE
-  airwin-registry
+  ferment-base
   ferment::ferment_ui
   juce::juce_audio_utils
   juce::juce_audio_processors
@@ -302,7 +302,7 @@ target_sources(ferment_ui_gallery PRIVATE
   ${FERMENT_ALL_EDITOR_SOURCES}
 )
 target_link_libraries(ferment_ui_gallery PRIVATE
-  airwin-registry
+  ferment-base
   ferment::ferment_ui
   juce::juce_audio_utils
   juce::juce_audio_processors

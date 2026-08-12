@@ -50,6 +50,22 @@ enum {
     kNumParameters
 };
 
+// Frozen param ABI: downstream pipelines (and the Cuts iOS vendor copy)
+// address parameters by index as kParamA.. — indices never reorder, new
+// parameters append only.
+enum {
+    kParamA = kParamInput,
+    kParamB = kParamCeiling,
+    kParamC = kParamKnee,
+    kParamD = kParamTilt,
+    kParamE = kParamBias,
+    kParamF = kParamMix,
+    kParamG = kParamOutput,
+    kParamH = kParamAutoGain,
+    kParamI = kParamDelta
+};
+
+
 const int kNumPrograms = 0;
 const int kNumInputs = 2;
 const int kNumOutputs = 2;
