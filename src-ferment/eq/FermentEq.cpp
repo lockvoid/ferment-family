@@ -1,6 +1,6 @@
 /*
- * Ferment EQ implementation. Mirrors `FermentEqProcessor::processBlockT`
- * in `the vendored DSP tree/eq/FermentEqProcessor.cpp`.
+ * Ferment EQ implementation. Bit-identical to
+ * `FermentEqProcessor::processBlockT`.
  */
 
 #include "FermentEq.h"
@@ -174,7 +174,10 @@ void FermentEq::getParameterDisplay(VstInt32 index, char* text) {
 }
 
 void FermentEq::recomputeCoeffs() {
-    const double sr = static_cast<double>(getSampleRate());
+    // The member, not getSampleRate(): the accessor asserts on a degenerate
+    // rate in Debug builds, and w = 2*pi*f/sr below divides by it.
+    double sr = static_cast<double>(sampleRate);
+    if (sr < 8000.0) sr = 48000.0;
     for (int b = 0; b < kNumBands; ++b) {
         const int off = b * kBandStride;
         const bool on = p[off + kBandOnOffset] >= 0.5f;

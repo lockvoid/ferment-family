@@ -201,7 +201,9 @@ void FermentClip::processT(T** inputs, T** outputs, VstInt32 sampleFrames)
     T* out1 = outputs[0];
     T* out2 = outputs[1];
 
-    double sr = getSampleRate();
+    // The member, not getSampleRate(): the accessor asserts on a degenerate
+    // rate in Debug builds, before the fallback below ever gets to run.
+    double sr = (double)sampleRate;
     if (sr < 8000.0) sr = 48000.0;
     const double srOs = sr * 4.0;
 

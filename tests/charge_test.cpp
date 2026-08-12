@@ -619,15 +619,23 @@ namespace
             auto in = sine(440.0, -10.0, 0.6);
             auto out = render(dsp, in, in);
 
-            double worst = 0.0;
-            for (size_t i = 0; i < out.l.size(); ++i)
+            double worst = 0.0, peak = 0.0;
+            for (size_t i = 0; i < out.l.size(); ++i) {
                 worst = std::max(worst, std::fabs(out.l[i] - out.r[i]));
+                peak  = std::max(peak, std::fabs(out.l[i]));
+            }
+            // Relative, not absolute: the output dither is magnitude-
+            // proportional (scaled by 2^expon) and decorrelated per channel
+            // on purpose, so the absolute gap tracks signal level. -100 dB
+            // relative is far below the dither floor yet still catches any
+            // real one-sided regression, which is orders of magnitude larger.
+            const double rel = worst / (peak + 1e-30);
             const double rmsGap = std::fabs(rmsDb(out.l) - rmsDb(out.r));
 
             char buf[160];
-            std::snprintf(buf, sizeof buf, "%s: max sample gap %.2e, RMS gap %.4f dB",
-                          s.name, worst, rmsGap);
-            check("L and R match", worst < 1e-6 && rmsGap < 0.01, buf);
+            std::snprintf(buf, sizeof buf, "%s: gap %.2e (%.1f dB rel), RMS gap %.4f dB",
+                          s.name, worst, 20.0 * std::log10(rel + 1e-30), rmsGap);
+            check("L and R match", rel < 1e-5 && rmsGap < 0.01, buf);
         }
     }
 

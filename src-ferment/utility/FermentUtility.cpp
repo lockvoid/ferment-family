@@ -1,6 +1,6 @@
 /*
- * Ferment Utility implementation. Mirrors `FermentUtilityProcessor::processBlockT`
- * in `the vendored DSP tree/utility/FermentUtilityProcessor.cpp`.
+ * Ferment Utility implementation. Bit-identical to
+ * `FermentUtilityProcessor::processBlockT`.
  */
 
 #include "FermentUtility.h"
@@ -95,7 +95,11 @@ void FermentUtility::getParameterDisplay(VstInt32 index, char* text) {
 
 template <typename T>
 void FermentUtility::processT(T** inputs, T** outputs, VstInt32 sampleFrames) {
-    const double sr = static_cast<double>(getSampleRate());
+    // The member, not getSampleRate(): the accessor asserts on a degenerate
+    // rate in Debug builds, and the DC blocker and bass-mono crossover both
+    // divide by sr.
+    double sr = static_cast<double>(sampleRate);
+    if (sr < 8000.0) sr = 48000.0;
 
     const double gainDb  = gainFromNorm(p[kParamGain]);
     const double gainLin = std::pow(10.0, gainDb / 20.0);

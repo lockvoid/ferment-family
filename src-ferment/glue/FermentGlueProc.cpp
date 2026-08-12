@@ -232,16 +232,25 @@ static void processInternal(FermentGlue &self, T **inputs, T **outputs, VstInt32
     }
 }
 
+/*  The member, not getSampleRate(): the accessor asserts on a degenerate rate
+    in Debug builds, and a zero or negative rate would put NaN into every time
+    constant above.  Same guard as the rest of the family. */
+static inline double saneRate(float sampleRate)
+{
+    const double sr = (double)sampleRate;
+    return sr < 8000.0 ? 48000.0 : sr;
+}
+
 void FermentGlue::processReplacing(float **inputs, float **outputs, VstInt32 sampleFrames)
 {
-    processInternal<float>(*this, inputs, outputs, sampleFrames, getSampleRate(),
+    processInternal<float>(*this, inputs, outputs, sampleFrames, saneRate(sampleRate),
                            A, B, C, D, E, F, G, H, I, J,
                            envRMS, envGR, hpfL_z1, hpfR_z1, fpdL, fpdR);
 }
 
 void FermentGlue::processDoubleReplacing(double **inputs, double **outputs, VstInt32 sampleFrames)
 {
-    processInternal<double>(*this, inputs, outputs, sampleFrames, getSampleRate(),
+    processInternal<double>(*this, inputs, outputs, sampleFrames, saneRate(sampleRate),
                             A, B, C, D, E, F, G, H, I, J,
                             envRMS, envGR, hpfL_z1, hpfR_z1, fpdL, fpdR);
 }

@@ -238,7 +238,9 @@ void FermentCharge::processT(T** inputs, T** outputs, VstInt32 sampleFrames)
     // A host should always give us a sane rate, but zero or negative would
     // divide by zero when deriving filter coefficients and time constants and
     // spray NaN into the audio stream. Fall back rather than emit garbage.
-    double sr = (double)getSampleRate();
+    // The member, not getSampleRate(): the accessor asserts on a degenerate
+    // rate in Debug builds, before this guard ever gets to run.
+    double sr = (double)sampleRate;
     if (!(sr > 0.0)) sr = 44100.0;
     const double invTauSr = 1.0 / (kSmoothSeconds * sr);
 
