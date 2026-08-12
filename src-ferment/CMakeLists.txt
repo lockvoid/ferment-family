@@ -120,6 +120,73 @@ target_sources(ferment-eq PRIVATE
   ${FERMENT_COMMON_SOURCES}
 )
 
+# ---- Ferment Charge ----
+ferment_add_plugin(
+  ferment-charge
+  "Ferment Charge"
+  "com.ferment.dsp.charge"
+  Frmt
+  FmCh
+  "https://ferment.dsp/lv2/charge"
+  "com.ferment.dsp.charge"
+  charge
+)
+target_sources(ferment-charge PRIVATE
+  charge/FermentChargeProcessor.cpp
+  charge/FermentChargeProcessor.h
+  charge/FermentChargeEditor.cpp
+  charge/FermentChargeEditor.h
+  charge/FermentCharge.cpp
+  charge/FermentChargeProc.cpp
+  charge/FermentCharge.h
+  charge/FermentChargeTables.h
+  ${FERMENT_COMMON_SOURCES}
+)
+
+# ---- Ferment Clip ----
+ferment_add_plugin(
+  ferment-clip
+  "Ferment Clip"
+  "com.ferment.dsp.clip"
+  Frmt
+  FmCp
+  "https://ferment.dsp/lv2/clip"
+  "com.ferment.dsp.clip"
+  clip
+)
+target_sources(ferment-clip PRIVATE
+  clip/FermentClipProcessor.cpp
+  clip/FermentClipProcessor.h
+  clip/FermentClipEditor.cpp
+  clip/FermentClipEditor.h
+  clip/FermentClip.cpp
+  clip/FermentClipProc.cpp
+  clip/FermentClip.h
+  ${FERMENT_COMMON_SOURCES}
+)
+
+# ---- Ferment Limit ----
+ferment_add_plugin(
+  ferment-limit
+  "Ferment Limit"
+  "com.ferment.dsp.limit"
+  Frmt
+  FmLm
+  "https://ferment.dsp/lv2/limit"
+  "com.ferment.dsp.limit"
+  limit
+)
+target_sources(ferment-limit PRIVATE
+  limit/FermentLimitProcessor.cpp
+  limit/FermentLimitProcessor.h
+  limit/FermentLimitEditor.cpp
+  limit/FermentLimitEditor.h
+  limit/FermentLimit.cpp
+  limit/FermentLimitProc.cpp
+  limit/FermentLimit.h
+  ${FERMENT_COMMON_SOURCES}
+)
+
 # ---- Ferment Utility ----
 ferment_add_plugin(
   ferment-utility
