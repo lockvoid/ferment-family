@@ -117,11 +117,15 @@ done
 } > "$TMPDIR/distribution.xml"
 
 # Combine sub-pkgs into unified product pkg.
-# Artifact naming: <name>-<version>-<os>-<arch>, all lowercase.
-# arm64 on Apple Silicon builds, x86_64 on Intel; FERMENT_ARCH=universal
-# overrides when CMAKE_OSX_ARCHITECTURES builds both.
+# Artifact naming: <name>-<os>-<arch>, all lowercase, NO version.
+#
+# The download is served from a CDN at a fixed URL, so the file name has to
+# stay the same release to release — a versioned name would mean editing the
+# link on the site every time.  The version is still carried where it does
+# something: the component pkgs and pkg-refs (which is how macOS decides an
+# install is an upgrade), the installer's title, and the mounted volume name.
 ARCH="${FERMENT_ARCH:-$(uname -m)}"
-OUT_BASE="ferment-family-$VERSION-macos-$ARCH"
+OUT_BASE="ferment-family-macos-$ARCH"
 pushd "$TMPDIR" > /dev/null
 
 if [ -n "${MAC_INSTALLING_CERT:-}" ]; then
@@ -142,7 +146,7 @@ mkdir -p "$DMGSRC"
 mv "$TMPDIR/$OUT_BASE.pkg" "$DMGSRC/"
 
 rm -f "$OUTPUT_DIR/$OUT_BASE.dmg"
-hdiutil create /tmp/ferment-tmp.dmg -ov -volname "$OUT_BASE" -fs HFS+ -srcfolder "$DMGSRC"
+hdiutil create /tmp/ferment-tmp.dmg -ov -volname "Ferment Family $VERSION" -fs HFS+ -srcfolder "$DMGSRC"
 hdiutil convert /tmp/ferment-tmp.dmg -format UDZO -o "$OUTPUT_DIR/$OUT_BASE.dmg"
 rm -f /tmp/ferment-tmp.dmg
 
@@ -158,4 +162,4 @@ if [ -n "${MAC_SIGNING_CERT:-}" ]; then
   fi
 fi
 
-echo "DMG created: $OUTPUT_DIR/$OUT_BASE.dmg"
+echo "DMG created: $OUTPUT_DIR/$OUT_BASE.dmg (version $VERSION)"

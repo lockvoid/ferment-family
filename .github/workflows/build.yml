@@ -20,10 +20,17 @@ jobs:
         run: cmake --build build -j 3
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      # The version comes from CMakeLists.txt, not from the ref: it goes inside
+      # the pkg, where macOS uses it to tell an upgrade from a fresh install,
+      # and a branch push would otherwise stamp the branch name in as a
+      # version.  The file name carries no version at all — it is served from
+      # a fixed CDN URL.
       - name: Package (unsigned)
-        run: >
-          FERMENT_ARCH=universal bash scripts/installer_mac/make_ferment_installer.sh
-          "${GITHUB_REF_NAME#v}" build dist scripts/installer_mac/resources
+        run: |
+          ver=$(sed -n 's/^project(ferment-family VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          echo "packaging version ${ver:?could not read version from CMakeLists.txt}"
+          FERMENT_ARCH=universal bash scripts/installer_mac/make_ferment_installer.sh \
+            "$ver" build dist scripts/installer_mac/resources
       - uses: actions/upload-artifact@v4
         with:
           name: macos-universal-dmg
@@ -42,9 +49,9 @@ jobs:
       - name: Package VST3 zip
         shell: pwsh
         run: |
-          $ver = "${env:GITHUB_REF_NAME}" -replace '^v',''
           New-Item -ItemType Directory -Force dist | Out-Null
-          $out = "dist/ferment-family-$ver-windows-x64"
+          # No version in the name: fixed CDN URL, same as the macOS DMG.
+          $out = "dist/ferment-family-windows-x64"
           New-Item -ItemType Directory -Force $out | Out-Null
           Get-ChildItem -Recurse -Directory build/src-ferment -Filter "*.vst3" |
             Where-Object { $_.FullName -match "Release" } |
