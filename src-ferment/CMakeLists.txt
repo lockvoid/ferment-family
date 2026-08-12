@@ -218,6 +218,66 @@ target_sources(ferment-utility PRIVATE
   ${FERMENT_COMMON_SOURCES}
 )
 
+
+# ---- Ferment Percept ----
+# The ear before the chain: realtime measurement (BS.1770 loudness, true
+# peak, crest, tilt, band share, mono fold), verdicts, and the targets a
+# master should hit.  The wrapper lives in percept/; core/ is the pure C++
+# layer shared with Master, JUCE-free so the same code runs headless.
+ferment_add_plugin(
+  ferment-percept
+  "Ferment Percept"
+  "com.ferment.dsp.percept"
+  Frmt
+  FmAn
+  "https://ferment.dsp/lv2/percept"
+  "com.ferment.dsp.percept"
+  percept
+)
+target_sources(ferment-percept PRIVATE
+  percept/FermentPerceptProcessor.cpp
+  percept/FermentPerceptProcessor.h
+  percept/FermentPerceptEditor.cpp
+  percept/FermentPerceptEditor.h
+  core/AnalyzerCore.cpp
+  core/AnalyzerCore.h
+  core/FermentPolicy.cpp
+  core/FermentPolicy.h
+  ${FERMENT_COMMON_SOURCES}
+)
+
+# ---- Ferment Master ----
+# The whole chain as one plugin: Stage -> Charge -> Tone -> Clip -> Limit,
+# per-module latency-matched bypass, and one Learn that sets the chain from
+# ten seconds of the track.
+ferment_add_plugin(
+  ferment-master
+  "Ferment Master"
+  "com.ferment.dsp.master"
+  Frmt
+  FmMa
+  "https://ferment.dsp/lv2/master"
+  "com.ferment.dsp.master"
+  master
+)
+target_sources(ferment-master PRIVATE
+  master/FermentMasterProcessor.cpp
+  master/FermentMasterProcessor.h
+  master/FermentMasterEditor.cpp
+  master/FermentMasterEditor.h
+  core/MasterCore.cpp
+  core/MasterCore.h
+  core/AnalyzerCore.cpp
+  core/FermentPolicy.cpp
+  charge/FermentCharge.cpp
+  charge/FermentChargeProc.cpp
+  clip/FermentClip.cpp
+  clip/FermentClipProc.cpp
+  limit/FermentLimit.cpp
+  limit/FermentLimitProc.cpp
+  ${FERMENT_COMMON_SOURCES}
+)
+
 # ---- screenshots ----
 # One command to regenerate every plugin's editor at 1x and 2x into
 # screenshots/ at the repo root:
@@ -249,6 +309,8 @@ juce_add_gui_app(ferment_ui_gallery
 set(FERMENT_SHOT_PROCESSORS "")
 foreach(entry
     "charge=charge/FermentChargeProcessor.cpp"
+    "percept=percept/FermentPerceptProcessor.cpp"
+    "master=master/FermentMasterProcessor.cpp"
     "clip=clip/FermentClipProcessor.cpp"
     "eq=eq/FermentEqProcessor.cpp"
     "glue=glue/FermentGlueProcessor.cpp"
@@ -276,6 +338,8 @@ set(FERMENT_ALL_EDITOR_SOURCES
   glue/FermentGlueEditor.cpp glue/FermentGlue.cpp glue/FermentGlueProc.cpp
   limit/FermentLimitEditor.cpp limit/FermentLimit.cpp limit/FermentLimitProc.cpp
   utility/FermentUtilityEditor.cpp utility/FermentUtility.cpp
+  percept/FermentPerceptEditor.cpp core/AnalyzerCore.cpp core/FermentPolicy.cpp
+  master/FermentMasterEditor.cpp core/MasterCore.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../src/airwin_consolidated_base.cpp
   ${FERMENT_COMMON_SOURCES}
 )

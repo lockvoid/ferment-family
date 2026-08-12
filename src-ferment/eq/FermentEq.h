@@ -1,6 +1,5 @@
 /*
- * Ferment EQ — Airwindows-style port of the JUCE plugin in
- * `the vendored DSP tree/eq/`.
+ * Ferment EQ — the pure-DSP layer behind FermentEqProcessor.
  *
  * 8 bands × { type, freq, gain, q, on } + global output gain.
  * RBJ biquad cookbook DSP — bit-identical to the JUCE version's `processBlockT`.

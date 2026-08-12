@@ -7,11 +7,13 @@
     that has hard-coded a pixel somewhere.
 */
 
+#include "../src-ferment/percept/FermentPerceptProcessor.h"
 #include "../src-ferment/charge/FermentChargeProcessor.h"
 #include "../src-ferment/clip/FermentClipProcessor.h"
 #include "../src-ferment/eq/FermentEqProcessor.h"
 #include "../src-ferment/glue/FermentGlueProcessor.h"
 #include "../src-ferment/limit/FermentLimitProcessor.h"
+#include "../src-ferment/master/FermentMasterProcessor.h"
 #include "../src-ferment/utility/FermentUtilityProcessor.h"
 
 #include "FermentToolAudio.h"
@@ -46,7 +48,9 @@ public:
         add ("Glue",    std::make_unique<FermentGlueProcessor>());
         add ("Charge",  std::make_unique<FermentChargeProcessor>());
         add ("Utility", std::make_unique<FermentUtilityProcessor>());
-        add ("EQ",      std::make_unique<FermentEqProcessor>());
+        add ("EQ",       std::make_unique<FermentEqProcessor>());
+        add ("Percept",  std::make_unique<FermentPerceptProcessor>());
+        add ("Master",   std::make_unique<FermentMasterProcessor>());
 
         for (size_t i = 0; i < plugins.size(); ++i)
             pluginBox.addItem (plugins[i].name, (int) i + 1);

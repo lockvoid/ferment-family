@@ -65,7 +65,7 @@ const int kNumInputs = 2;
 const int kNumOutputs = 2;
 const unsigned long kUniqueId = 'FmLm';
 
-// Fixed internals (voiced on a broad genre set, see the design notes).
+// Fixed internals, voiced by ear across a broad genre set.
 const double kAttackWindowMs = 2.0;
 const double kHoldMs = 25.0;
 const double kTpMarginDb = 0.3;

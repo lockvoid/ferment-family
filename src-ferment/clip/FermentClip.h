@@ -5,9 +5,8 @@
  *  halfband oversampling, with tilt (pre/de-emphasis) clipping, bias for
  *  even harmonics, RMS-matched auto gain and delta monitoring.
  *
- *  Original implementation from the spec in the design notes. The reference
- *  behaviour is the numpy prototype in the numpy reference; voicing was
- *  A/B'd on a broad genre set (the listening notes).
+ *  Voiced by ear and A/B'd against a numpy reference implementation
+ *  across a broad genre set.
  *
  *  Signal chain:
  *    input trim

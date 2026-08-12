@@ -6,11 +6,13 @@
         ./ferment_editor_shots <output-dir>
 */
 
+#include "../src-ferment/percept/FermentPerceptProcessor.h"
 #include "../src-ferment/charge/FermentChargeProcessor.h"
 #include "../src-ferment/clip/FermentClipProcessor.h"
 #include "../src-ferment/eq/FermentEqProcessor.h"
 #include "../src-ferment/glue/FermentGlueProcessor.h"
 #include "../src-ferment/limit/FermentLimitProcessor.h"
+#include "../src-ferment/master/FermentMasterProcessor.h"
 #include "../src-ferment/utility/FermentUtilityProcessor.h"
 
 #include "FermentToolAudio.h"
@@ -31,6 +33,15 @@ using ferment::tools::primeWithAudio;
 /** How long to let editor Timers run before the shot. Sized so meter ballistics
     finish converging — see the note in shoot(). */
 constexpr int settleMs = 1500;
+
+/*  The Analyzer draws three seconds of history as a sparkline, and a ring that
+    is only part full draws a shorter line.  How much of it is full after a
+    fixed wall-clock settle depends on how many 20 Hz ticks the machine happened
+    to fit, so analyzer.png churned on every run.  Waiting past the point where
+    the ring saturates removes the dependence entirely: after that, one more tick
+    or one fewer changes nothing.
+*/
+constexpr int historySettleMs = 4000;
 
 /** Reports the knob face sizes an editor actually laid out, so drift across the
     family shows up as a number rather than a feeling. */
@@ -81,7 +92,8 @@ void writePng (juce::Component& c, const juce::File& dir, const juce::String& na
 
 template <typename Processor>
 void shoot (const juce::File& dir, const juce::String& name,
-            const std::function<void (Processor&)>& setup = {})
+            const std::function<void (Processor&)>& setup = {},
+            int settle = settleMs)
 {
     Processor processor;
     processor.prepareToPlay (48000.0, 512);
@@ -105,7 +117,7 @@ void shoot (const juce::File& dir, const juce::String& name,
     // creeping, and the shot then depended on exactly how many timer ticks the
     // machine happened to fit in the window: glue.png and charge.png came out
     // byte-different on every run, so screenshots/ churned with no code change.
-    juce::MessageManager::getInstance()->runDispatchLoopUntil (settleMs);
+    juce::MessageManager::getInstance()->runDispatchLoopUntil (settle);
 
     reportKnobSizes (*editor, name);
 
@@ -174,6 +186,29 @@ int main (int argc, char** argv)
         set (FermentEqProcessor::paramId (4, "on"),   0.0f);
 
         primeWithAudio (p, 64, 1.0f);
+    });
+
+    /*  The two adaptive plugins measure rather than react, so they need enough
+        audio to have an opinion: analyzer-core wants a few seconds before its
+        spectrum and its integrated loudness are ready, and a shot taken before
+        that is a picture of six dashes.  512 blocks is about 5.5 s at 48 k.
+    */
+    shoot<FermentPerceptProcessor> (outDir, "percept", [] (FermentPerceptProcessor& p)
+    {
+        primeWithAudio (p, 512, 0.9f);
+
+        const auto r = p.readout();
+        std::printf ("  percept  LUFS-I %.2f  tilt %.2f  sub share %.3f\n",
+                     r.lufsIntegrated, r.tiltDb, r.subShare);
+    }, historySettleMs);
+
+    shoot<FermentMasterProcessor> (outDir, "master", [] (FermentMasterProcessor& p)
+    {
+        primeWithAudio (p, 512, 1.2f);
+
+        const auto snap = p.snapshot();
+        std::printf ("  master   in %.2f LUFS  out %.2f LUFS  charge GR %.2f\n",
+                     snap.sourceLufs, snap.resultLufs, snap.chargeGrDb);
     });
 
     return 0;

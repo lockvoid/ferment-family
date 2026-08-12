@@ -1,6 +1,5 @@
 /*
- * Ferment Utility — Airwindows-style port of the JUCE plugin in
- * `the vendored DSP tree/utility/`.
+ * Ferment Utility — the pure-DSP layer behind FermentUtilityProcessor.
  *
  * Routing, gain, phase, stereo field, DC filter, bass mono.
  * Bit-identical DSP to `FermentUtilityProcessor::processBlockT`.

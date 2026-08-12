@@ -112,6 +112,60 @@ if (FERMENT_BUILD_TESTS)
       src-ferment/glue/FermentGlue.cpp
       src-ferment/glue/FermentGlueProc.cpp)
 
+
+  # ---- core layer (Percept + Master logic, JUCE-free) ----
+  add_executable(analyzer_tests tests/analyzer_test.cpp
+      src-ferment/core/AnalyzerCore.cpp src-ferment/core/FermentPolicy.cpp)
+  target_compile_definitions(analyzer_tests PRIVATE _USE_MATH_DEFINES)
+  add_test(NAME analyzer_tests COMMAND analyzer_tests)
+
+  ferment_add_dsp_test(master_tests tests/master_test.cpp
+      src-ferment/core/MasterCore.cpp
+      src-ferment/core/AnalyzerCore.cpp src-ferment/core/FermentPolicy.cpp
+      src-ferment/charge/FermentCharge.cpp src-ferment/charge/FermentChargeProc.cpp
+      src-ferment/clip/FermentClip.cpp src-ferment/clip/FermentClipProc.cpp
+      src-ferment/limit/FermentLimit.cpp src-ferment/limit/FermentLimitProc.cpp)
+
+  # ---- faces: these drive real editors through the message loop, so they
+  # need modal loops permitted, unlike the processor tests above ----
+  function(ferment_add_face_test NAME MAIN)
+    add_executable(${NAME} ${MAIN} ${ARGN}
+        src/airwin_consolidated_base.cpp)
+    target_link_libraries(${NAME} PRIVATE
+        ferment::ferment_ui
+        juce::juce_audio_utils
+        juce::juce_audio_processors)
+    target_compile_definitions(${NAME} PRIVATE
+        _USE_MATH_DEFINES=1
+        JUCE_STANDALONE_APPLICATION=1
+        JUCE_MODAL_LOOPS_PERMITTED=1
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_USE_CAMERA=disabled)
+    add_test(NAME ${NAME} COMMAND ${NAME})
+  endfunction()
+
+  ferment_add_face_test(ferment_ui_test tests/ferment_ui_test.cpp)
+
+  ferment_add_face_test(percept_plugin_test tests/percept_plugin_test.cpp
+      src-ferment/percept/FermentPerceptProcessor.cpp
+      src-ferment/percept/FermentPerceptEditor.cpp
+      src-ferment/core/AnalyzerCore.cpp
+      src-ferment/core/FermentPolicy.cpp)
+
+  ferment_add_face_test(master_plugin_test tests/master_plugin_test.cpp
+      src-ferment/master/FermentMasterProcessor.cpp
+      src-ferment/master/FermentMasterEditor.cpp
+      src-ferment/core/MasterCore.cpp
+      src-ferment/core/AnalyzerCore.cpp
+      src-ferment/core/FermentPolicy.cpp
+      src-ferment/charge/FermentCharge.cpp
+      src-ferment/charge/FermentChargeProc.cpp
+      src-ferment/clip/FermentClip.cpp
+      src-ferment/clip/FermentClipProc.cpp
+      src-ferment/limit/FermentLimit.cpp
+      src-ferment/limit/FermentLimitProc.cpp)
+
   # UI-spec acceptance: the drawn EQ curve must match what the DSP does.
   ferment_add_processor_test(eq_response_test tests/eq_response_test.cpp
       src-ferment/eq/FermentEqProcessor.cpp
