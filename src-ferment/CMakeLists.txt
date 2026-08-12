@@ -27,7 +27,7 @@ endif()
 function(ferment_add_plugin TARGET_NAME PRODUCT_NAME BUNDLE_ID MFR_CODE PLUG_CODE LV2_URI CLAP_ID SRC_DIR)
   juce_add_plugin(${TARGET_NAME}
     PRODUCT_NAME "${PRODUCT_NAME}"
-    COMPANY_NAME "Ferment DSP"
+    COMPANY_NAME "Ferment"
     COMPANY_WEBSITE "https://ferment.dsp/"
     BUNDLE_ID "${BUNDLE_ID}"
     PLUGIN_MANUFACTURER_CODE ${MFR_CODE}
@@ -234,7 +234,7 @@ add_custom_target(ferment-screenshots
 # plugin picker and a display-scale picker.  Opens no audio device.
 juce_add_gui_app(ferment_ui_gallery
   PRODUCT_NAME "Ferment UI Gallery"
-  COMPANY_NAME "Ferment DSP"
+  COMPANY_NAME "Ferment"
   BUNDLE_ID "com.ferment.dsp.uigallery"
 )
 
