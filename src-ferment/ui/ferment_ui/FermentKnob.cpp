@@ -1,6 +1,7 @@
 #include "FermentKnob.h"
 
 #include <cmath>
+#include <functional>
 #include <limits>
 
 namespace ferment
@@ -68,6 +69,14 @@ namespace
     {
         return text.containsAnyOf ("0123456789");
     }
+
+    /** How finely valueForText() samples a knob's display mapping in order to
+        invert it.  File scope rather than a local in that function: MSVC will
+        not let a lambda read a function-local constexpr it has not captured,
+        and capturing a compile-time constant to satisfy one compiler is the
+        kind of thing that gets "cleaned up" later by someone building on
+        clang. */
+    constexpr int gridSteps = 256;
 }
 
 void FermentKnob::Rotary::paint (juce::Graphics& g)
@@ -346,10 +355,9 @@ bool FermentKnob::valueForText (const juce::String& text, const Formatter& forma
     if (typed.isEmpty() || formatter == nullptr || hi <= lo)
         return false;
 
-    // The grid is what makes this work for any formatter without knowing what
-    // it does: sample the display mapping, then refine around the best sample.
-    constexpr int gridSteps = 256;
-
+    // The grid (gridSteps, above) is what makes this work for any formatter
+    // without knowing what it does: sample the display mapping, then refine
+    // around the best sample.
     auto valueAt = [lo, hi] (int i) { return lo + (hi - lo) * (double) i / (double) gridSteps; };
 
     /*  Which mode this knob is in is a property of the KNOB, not of what was

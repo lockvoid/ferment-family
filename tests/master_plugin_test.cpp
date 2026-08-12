@@ -30,6 +30,7 @@
 
 #include <array>
 #include <atomic>
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -313,7 +314,7 @@ void testParameterAbiAndMapping()
     p.prepareToPlay (kSR, kBlock);
 
     // ---- indices never reorder -------------------------------------------
-    // Downstream integrations address these by index, so the enum,
+    // Cuts iOS and the offline pipelines address these by index, so the enum,
     // the id table and the order APVTS reports must be one thing.
     int mismatched = 0;
 

@@ -1,6 +1,7 @@
 #include "FermentPerceptEditor.h"
 #include "FermentPerceptProcessor.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 

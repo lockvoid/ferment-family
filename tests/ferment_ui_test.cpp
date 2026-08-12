@@ -31,6 +31,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <vector>
@@ -195,6 +196,34 @@ bool typeInto (ferment::FermentKnob& knob, const juce::String& text)
 
     return true;
 }
+
+/*  A hand-drawn stand-in for a component: the same primitives, in the same
+    order, with no component behind them.
+
+    The paint budgets below are measured against one of these rather than
+    against a label count.  What a primitive allocates is a property of the
+    machine, not of our code — on the macOS 14 CI runner a stroked path costs
+    an order of magnitude more than it does on a macOS 26 laptop — so a budget
+    of "labels x drawText" quietly assumed shapes were free, passed locally
+    and failed on CI.  Against a stand-in both machines ask the same question:
+    does the component allocate more than its own drawing does?
+
+    The stand-in keeps a juce::Path member because that is how a component
+    that draws one per frame is supposed to hold it: cleared and refilled, not
+    rebuilt.  A component that allocates a fresh one goes over budget, which
+    is the regression this is here to catch.
+*/
+struct DrawingProbe : juce::Component
+{
+    std::function<void (juce::Graphics&, juce::Path&)> draw;
+    juce::Path scratch;
+
+    void paint (juce::Graphics& g) override
+    {
+        if (draw != nullptr)
+            draw (g, scratch);
+    }
+};
 
 /** A paint into a throwaway image, with the graphics context built before the
     allocation gate opens so only the component's own paint is counted. */
@@ -726,10 +755,9 @@ void testMeterStrip()
         check (true, "MeterStrip with NaN and Inf readings", "painted");
     }
 
-    /*  What one juce::Graphics::drawText costs, so the component numbers below
-        can be read against something.  JUCE 8 shapes text on every call, and
-        that shaping allocates: no component that prints a label can be
-        allocation-free while it does. */
+    /*  What one juce::Graphics::drawText costs, printed for scale.  JUCE 8
+        shapes text on every call, and that shaping allocates: no component
+        that prints a label can be allocation-free while it does. */
     size_t perDrawText = 0;
     {
         struct OneLabel : juce::Component
@@ -766,16 +794,56 @@ void testMeterStrip()
             strip.advance();
         }
 
-        /*  The bar, the peak marker and the sparkline must cost nothing on top
-            of the twelve labels: a Path or a juce::String rebuilt per frame
-            shows up here as a number that does not fit the text budget, and one
-            that GROWS per frame shows up as a second measurement that differs
-            from the first. */
-        const auto allocs = allocationsInPaint (strip, 460, strip.preferredHeight());
-        const auto budget = 12 * perDrawText;
+        /*  Twelve labels, twelve bar rectangles, one peak marker and six
+            sparklines, drawn by hand.  The strip may not cost more than that:
+            a juce::String or a Path rebuilt per frame shows up here as a
+            number over the stand-in's, and one that GROWS per frame shows up
+            as a second measurement that differs from the first. */
+        const int stripH = strip.preferredHeight();
+        const juce::String caption ("LANE"), value ("-12.0 LU");
 
-        check (allocs <= budget, "MeterStrip::paint adds nothing to the cost of its text",
-               juce::String ((int) allocs) + " allocations for 12 labels, budget "
+        DrawingProbe probe;
+        probe.draw = [caption, value] (juce::Graphics& g, juce::Path& path)
+        {
+            const auto captionFont = ferment::theme::monoTracked (9.0f, true);
+            const auto valueFont   = ferment::theme::mono (12.0f);
+
+            for (int lane = 0; lane < 6; ++lane)
+            {
+                const auto row = juce::Rectangle<int> (0, lane * ferment::MeterStrip::laneHeight,
+                                                       460, ferment::MeterStrip::laneHeight);
+
+                g.setColour (ferment::theme::labelDim);
+                g.setFont (captionFont);
+                g.drawText (caption, row, juce::Justification::centredLeft, false);
+
+                g.setColour (ferment::theme::amber);
+                g.setFont (valueFont);
+                g.drawText (value, row, juce::Justification::centredRight, false);
+
+                const auto bar = row.toFloat().withHeight (6.0f);
+                g.setColour (ferment::theme::faceEdge);
+                g.fillRoundedRectangle (bar, 2.0f);
+                g.setColour (ferment::theme::amber);
+                g.fillRoundedRectangle (bar.withWidth (bar.getWidth() * 0.6f), 2.0f);
+
+                if (lane == 2)                      // the one lane with a peak marker
+                    g.fillRect (juce::Rectangle<float> (10.0f, bar.getY(), 2.0f, bar.getHeight()));
+
+                path.clear();
+                path.startNewSubPath (0.0f, 0.0f);
+                for (int i = 1; i < 60; ++i)        // 3 s of history at 20 Hz
+                    path.lineTo ((float) i, (float) (i % 7));
+                g.strokePath (path, juce::PathStrokeType (1.0f));
+            }
+        };
+        probe.setBounds (0, 0, 460, stripH);
+
+        const auto allocs = allocationsInPaint (strip, 460, stripH);
+        const auto budget = allocationsInPaint (probe, 460, stripH);
+
+        check (allocs <= budget, "MeterStrip::paint costs no more than its own drawing",
+               juce::String ((int) allocs) + " allocations, the same drawing by hand costs "
                    + juce::String ((int) budget));
 
         for (int i = 0; i < 40; ++i)
@@ -816,10 +884,37 @@ void testMeterStrip()
         for (int i = 0; i < 6; ++i)
             targets.setValue (i, -1.5 * i);
 
-        const auto allocs = allocationsInPaint (targets, 240, targets.preferredHeight());
-        check (allocs <= 12 * perDrawText, "TargetList::paint adds nothing to the cost of its text",
-               juce::String ((int) allocs) + " allocations for 12 labels, budget "
-                   + juce::String ((int) (12 * perDrawText)));
+        const int rowsH = targets.preferredHeight();
+        const juce::String label ("ROW"), value ("-1.5 dB");
+
+        DrawingProbe probe;
+        probe.draw = [label, value] (juce::Graphics& g, juce::Path&)
+        {
+            const auto labelFont = ferment::theme::monoTracked (9.0f, true);
+            const auto valueFont = ferment::theme::mono (11.0f);
+
+            for (int row = 0; row < 6; ++row)
+            {
+                const auto line = juce::Rectangle<int> (0, row * ferment::TargetList::rowHeight,
+                                                        240, ferment::TargetList::rowHeight);
+
+                g.setColour (ferment::theme::labelDim);
+                g.setFont (labelFont);
+                g.drawText (label, line, juce::Justification::centredLeft, false);
+
+                g.setColour (ferment::theme::amber);
+                g.setFont (valueFont);
+                g.drawText (value, line, juce::Justification::centredRight, false);
+            }
+        };
+        probe.setBounds (0, 0, 240, rowsH);
+
+        const auto allocs = allocationsInPaint (targets, 240, rowsH);
+        const auto budget = allocationsInPaint (probe, 240, rowsH);
+
+        check (allocs <= budget, "TargetList::paint costs no more than its own drawing",
+               juce::String ((int) allocs) + " allocations, the same drawing by hand costs "
+                   + juce::String ((int) budget));
     }
 
     {
@@ -855,10 +950,92 @@ void testMeterStrip()
         chips.setActive (0, true);
         chips.setBounds (0, 0, 300, chips.preferredHeight (300));
 
+        /*  One lit pill and four outlined ones, drawn by hand — with the same
+            captions the component has, because how much text shaping
+            allocates may well depend on how many glyphs it is shaping. */
+        juce::StringArray captions { "SUB HEAVY", "DARK", "BRIGHT", "PRE-CLIPPED", "MONO FRAGILE" };
+
+        DrawingProbe pills;
+        pills.draw = [captions] (juce::Graphics& g, juce::Path&)
+        {
+            g.setFont (ferment::theme::monoTracked (9.0f, true));
+
+            for (int chip = 0; chip < 5; ++chip)
+            {
+                const auto r = juce::Rectangle<float> ((float) chip * 60.0f, 0.0f, 56.0f,
+                                                       (float) ferment::VerdictChips::chipHeight);
+                const float radius = r.getHeight() * 0.5f;
+
+                g.setColour (ferment::theme::amber);
+                g.fillRoundedRectangle (r, radius);
+
+                if (chip != 0)                       // the unlit ones carry a rim
+                {
+                    g.setColour (ferment::theme::woodDark);
+                    g.drawRoundedRectangle (r.reduced (0.5f), radius, 1.0f);
+                }
+
+                g.setColour (ferment::theme::labelDim);
+                g.drawText (captions[chip], r.toNearestInt(), juce::Justification::centred, false);
+            }
+        };
+        pills.setBounds (0, 0, 300, chips.preferredHeight (300));
+
         const auto allocs = allocationsInPaint (chips, 300, chips.preferredHeight (300));
-        check (allocs <= 5 * perDrawText, "VerdictChips::paint adds nothing to the cost of its text",
-               juce::String ((int) allocs) + " allocations for 5 labels, budget "
-                   + juce::String ((int) (5 * perDrawText)));
+        const auto budget = allocationsInPaint (pills, 300, chips.preferredHeight (300));
+
+        check (allocs <= budget, "VerdictChips::paint costs no more than its own drawing",
+               juce::String ((int) allocs) + " allocations, the same drawing by hand costs "
+                   + juce::String ((int) budget));
+
+        /*  The lamp rail is the form Percept actually ships, and it draws
+            ellipses rather than pills — so it gets its own stand-in rather
+            than riding on the horizontal one's budget. */
+        chips.setVertical (true);
+        const int railH = chips.preferredHeight (150);
+        chips.setBounds (0, 0, 150, railH);
+
+        DrawingProbe lamps;
+        lamps.draw = [captions] (juce::Graphics& g, juce::Path&)
+        {
+            g.setFont (ferment::theme::monoTracked (9.0f, true));
+
+            for (int chip = 0; chip < 5; ++chip)
+            {
+                const auto row = juce::Rectangle<int> (0, chip * (ferment::VerdictChips::lampRowHeight
+                                                                  + ferment::VerdictChips::chipGap),
+                                                       150, ferment::VerdictChips::lampRowHeight);
+                const float d = ferment::VerdictChips::lampDiameter;
+                const juce::Rectangle<float> lamp (4.0f, (float) row.getCentreY() - d * 0.5f, d, d);
+
+                if (chip == 0)                       // lit: halo and lamp
+                {
+                    g.setColour (ferment::theme::amber.withAlpha (0.25f));
+                    g.fillEllipse (lamp.expanded (3.0f));
+                    g.setColour (ferment::theme::amber);
+                    g.fillEllipse (lamp);
+                }
+                else                                 // unlit: socket and ring
+                {
+                    g.setColour (ferment::theme::bg);
+                    g.fillEllipse (lamp);
+                    g.setColour (ferment::theme::woodDark);
+                    g.drawEllipse (lamp.reduced (0.5f), 1.0f);
+                }
+
+                g.setColour (ferment::theme::labelDim);
+                g.drawText (captions[chip], row.withTrimmedLeft ((int) (d + 12.0f)),
+                            juce::Justification::centredLeft, false);
+            }
+        };
+        lamps.setBounds (0, 0, 150, railH);
+
+        const auto railAllocs = allocationsInPaint (chips, 150, railH);
+        const auto railBudget = allocationsInPaint (lamps, 150, railH);
+
+        check (railAllocs <= railBudget, "the lamp rail costs no more than its own drawing",
+               juce::String ((int) railAllocs) + " allocations, the same drawing by hand costs "
+                   + juce::String ((int) railBudget));
     }
 }
 
