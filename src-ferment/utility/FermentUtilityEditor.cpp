@@ -6,46 +6,6 @@
 namespace T = ferment::theme;
 
 // =============================================================================
-//  Toggle styling
-// =============================================================================
-
-FermentUtilityEditor::ToggleLookAndFeel::ToggleLookAndFeel()
-{
-    setColour(juce::TextButton::textColourOffId, T::labelDim);
-    setColour(juce::TextButton::textColourOnId,  T::faceEdge);
-    setColour(juce::PopupMenu::backgroundColourId, T::faceTop);
-    setColour(juce::PopupMenu::textColourId,       T::labelCream);
-}
-
-void FermentUtilityEditor::ToggleLookAndFeel::drawButtonBackground(
-    juce::Graphics& g, juce::Button& button, const juce::Colour&,
-    bool isHighlighted, bool isDown)
-{
-    auto bounds = button.getLocalBounds().toFloat().reduced(1.0f);
-    const bool on = button.getToggleState();
-
-    auto fill = on ? T::amber : T::faceEdge;
-    if (isDown || isHighlighted)
-        fill = fill.brighter(0.08f);
-
-    g.setColour(fill);
-    g.fillRoundedRectangle(bounds, 3.0f);
-
-    // Lit buttons carry no outline — the amber fill is the state, and a darker
-    // rim around it only softens the edge that is doing the talking.
-    if (!on)
-    {
-        g.setColour(T::woodDark);
-        g.drawRoundedRectangle(bounds, 3.0f, 1.0f);
-    }
-}
-
-juce::Font FermentUtilityEditor::ToggleLookAndFeel::getTextButtonFont(juce::TextButton&, int)
-{
-    return T::monoTracked(10.0f, true);
-}
-
-// =============================================================================
 //  Editor
 // =============================================================================
 
@@ -73,14 +33,21 @@ FermentUtilityEditor::FermentUtilityEditor(FermentUtilityProcessor& p)
     });
 
     // ---- Toggles ----
-    for (auto* b : { &muteBtn, &phaseLBtn, &phaseRBtn, &dcBtn, &bassMonoBtn })
-        setupToggle(*b, true);
+    // attachTo() sets the clicking-toggles-state for us and keeps the
+    // attachment inside the button, where it cannot outlive its control.
+    const std::pair<ferment::FermentToggle*, const char*> boolToggles[] = {
+        { &muteBtn,     "mute"     },
+        { &phaseLBtn,   "phaseL"   },
+        { &phaseRBtn,   "phaseR"   },
+        { &dcBtn,       "dc"       },
+        { &bassMonoBtn, "bassmono" },
+    };
 
-    muteAtt      = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.apvts, "mute",      muteBtn);
-    phaseLAtt    = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.apvts, "phaseL",    phaseLBtn);
-    phaseRAtt    = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.apvts, "phaseR",    phaseRBtn);
-    dcAtt        = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.apvts, "dc",        dcBtn);
-    bassMonoAtt  = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.apvts, "bassmono",  bassMonoBtn);
+    for (auto& [button, paramId] : boolToggles)
+    {
+        addAndMakeVisible(*button);
+        button->attachTo(processor.apvts, paramId);
+    }
 
     // ---- Channel mode (5-button bar, driven by hidden ComboBox so we can attach) ----
     chanHidden.addItem("Stereo", 1);
@@ -90,12 +57,15 @@ FermentUtilityEditor::FermentUtilityEditor(FermentUtilityProcessor& p)
     chanHidden.addItem("Mono",   5);
     addChildComponent(chanHidden); // not visible — we drive it via buttons
 
+    // Bar buttons drive the hidden ComboBox from onClick, so their toggle state
+    // is set for them by its onChange rather than by the click — which is
+    // juce::Button's default, so there is nothing to turn off.
     const char* labels[] = { "ST", "SW", "L", "R", "M" };
     for (int i = 0; i < 5; ++i)
     {
         chanBtns[(size_t)i].setButtonText(labels[i]);
         chanBtns[(size_t)i].onClick = [this, i]() { chanHidden.setSelectedItemIndex(i, juce::sendNotificationSync); };
-        setupToggle(chanBtns[(size_t)i], false);
+        addAndMakeVisible(chanBtns[(size_t)i]);
     }
     chanAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processor.apvts, "chanmode", chanHidden);
@@ -117,7 +87,7 @@ FermentUtilityEditor::FermentUtilityEditor(FermentUtilityProcessor& p)
     {
         msBtns[(size_t)i].setButtonText(msLabels[i]);
         msBtns[(size_t)i].onClick = [this, i]() { msHidden.setSelectedItemIndex(i, juce::sendNotificationSync); };
-        setupToggle(msBtns[(size_t)i], false);
+        addAndMakeVisible(msBtns[(size_t)i]);
     }
     msAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processor.apvts, "mssolo", msHidden);
@@ -131,16 +101,7 @@ FermentUtilityEditor::FermentUtilityEditor(FermentUtilityProcessor& p)
     setSize(660, 204);
 }
 
-FermentUtilityEditor::~FermentUtilityEditor()
-{
-    // The toggles hold a raw pointer to a member look-and-feel; drop it before
-    // either goes out of scope.
-    for (auto* b : { &muteBtn, &phaseLBtn, &phaseRBtn, &dcBtn, &bassMonoBtn })
-        b->setLookAndFeel(nullptr);
-
-    for (auto& b : chanBtns) b.setLookAndFeel(nullptr);
-    for (auto& b : msBtns)   b.setLookAndFeel(nullptr);
-}
+FermentUtilityEditor::~FermentUtilityEditor() = default;
 
 void FermentUtilityEditor::addKnob(const char* paramId, const char* caption,
                                    ferment::FermentKnob::Formatter formatter)
@@ -148,13 +109,6 @@ void FermentUtilityEditor::addKnob(const char* paramId, const char* caption,
     knobs.push_back(std::make_unique<ferment::FermentKnob>(
         processor.apvts, paramId, caption, std::move(formatter)));
     addAndMakeVisible(*knobs.back());
-}
-
-void FermentUtilityEditor::setupToggle(juce::TextButton& b, bool clickToggles)
-{
-    b.setClickingTogglesState(clickToggles);
-    b.setLookAndFeel(&toggleLnf);
-    addAndMakeVisible(b);
 }
 
 void FermentUtilityEditor::paint(juce::Graphics& g)
@@ -207,13 +161,14 @@ void FermentUtilityEditor::resized()
     block.removeFromLeft(Knob::gutter);
 
     {
+        constexpr int btnH = ferment::FermentToggle::standardHeight;
         auto col = block.removeFromLeft(buttonsW)
-                        .withSizeKeepingCentre(buttonsW, 3 * 26 + 12);
+                        .withSizeKeepingCentre(buttonsW, 3 * btnH + 12);
 
-        phaseLBtn.setBounds(col.removeFromTop(26));
+        phaseLBtn.setBounds(col.removeFromTop(btnH));
         col.removeFromTop(4);
-        phaseRBtn.setBounds(col.removeFromTop(26));
+        phaseRBtn.setBounds(col.removeFromTop(btnH));
         col.removeFromTop(8);
-        muteBtn.setBounds(col.removeFromTop(26));
+        muteBtn.setBounds(col.removeFromTop(btnH));
     }
 }

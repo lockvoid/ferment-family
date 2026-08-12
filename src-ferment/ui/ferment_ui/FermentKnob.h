@@ -38,10 +38,42 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
 
     /** For the rare editor that needs to reach the control itself — a Q knob
         wanting a different drag sensitivity, say.  Do not attach to it. */
     juce::Slider& getSlider() noexcept { return slider; }
+
+    /** The value string currently printed under the knob.  Feeding this back
+        through setValueFromText() must return the knob to where it was, which
+        is the property the acceptance test pins. */
+    const juce::String& displayText() const noexcept { return valueText; }
+
+    // ---- text entry (UI_SPEC §3.1, §7.1) --------------------------------
+    /** Opens the inline editor over the value row: type, Enter commits, Esc
+        cancels, Tab commits and moves to the next knob.  A click on the value
+        row does this; editors can also drive it directly. */
+    void beginTextEntry();
+
+    /** Commits a typed string to the parameter, gestures balanced.  This is
+        what the inline editor calls on Enter, and it is the whole of text
+        entry — so a test that drives this drives the shipping path.
+        Returns false if the string did not parse to anything. */
+    bool setValueFromText (const juce::String& text);
+
+    /** Finds the slider value whose formatted text best matches @a text, by
+        inverting @a formatter numerically over [lo, hi].
+
+        The formatter is the DSP layer's own display mapping — every Ferment
+        knob is built from one — so inverting it is how a typed string reaches
+        the same value the face would print, without a second parsing table per
+        plugin that could disagree with the first.  Words are matched too, so
+        typing "hot" into a mode knob works.
+
+        Returns false when nothing sensible matched, leaving @a valueOut alone.
+        Static and pure so it can be tested without a message loop. */
+    static bool valueForText (const juce::String& text, const Formatter& formatter,
+                              double lo, double hi, double interval, double& valueOut);
 
     /** Height of the value row and the caption row below the knob face. */
     static constexpr int valueRowHeight   = 14;
@@ -84,9 +116,15 @@ private:
     class Rotary : public juce::Slider
     {
     public:
+        Rotary();
+
         void paint (juce::Graphics&) override;
         void mouseDown (const juce::MouseEvent&) override;
         void mouseUp (const juce::MouseEvent&) override;
+        bool keyPressed (const juce::KeyPress&) override;
+
+        /** Arrow-key nudge: steps is ±1, coarse is the shift-arrow variant. */
+        std::function<void (int steps, bool coarse)> onNudge;
 
     private:
         // JUCE's default drag extent; shift-drag makes the knob ten times finer.
@@ -94,12 +132,36 @@ private:
         static constexpr int fineSensitivity   = 2500;
     };
 
+    /*  A plain TextEditor treats Tab as focus traversal, which lands somewhere
+        arbitrary rather than on the next knob in the row. */
+    class ValueEditor : public juce::TextEditor
+    {
+    public:
+        std::function<bool()> onTabKey;
+        bool keyPressed (const juce::KeyPress&) override;
+    };
+
     void refreshValueText();
+    void nudge (int steps, bool coarse);
+    void setValueWithGesture (double newValue);
+    void commitTextEntry();
+    void endTextEntry();
+    /** The next FermentKnob in the enclosing editor, wrapping at the end. */
+    FermentKnob* nextKnob();
+
+    juce::Rectangle<int> valueRow() const;
 
     Rotary slider;
+    ValueEditor valueEditor;
     juce::String caption;
     juce::String valueText;
     Formatter formatter;
+
+    /*  Resolved once.  Typed values and keyboard nudges are written straight to
+        the parameter inside a begin/endChangeGesture pair rather than through
+        Slider::setValue, which would notify the host with no gesture around it —
+        the unbalanced-gesture bug the EQ wheel handler already had to fix. */
+    juce::RangedAudioParameter* param = nullptr;
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
 
