@@ -1,65 +1,115 @@
-# Ferment Family
+# Ferment
 
-The Ferment plugin suite — six plugins, one signal-chain philosophy:
+[![build](https://github.com/dimitrikochnev/ferment-family/actions/workflows/build.yml/badge.svg)](https://github.com/dimitrikochnev/ferment-family/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
 
-| Plugin | Role | Docs |
-|---|---|---|
-| Ferment Utility | gain / phase / width / bass-mono housekeeping | |
-| Ferment Glue | SSL-style bus compressor | [docs/GLUE.md](docs/GLUE.md) |
-| Ferment Charge | high octane levelling compressor (+ saturation) | [docs/CHARGE.md](docs/CHARGE.md) |
-| Ferment EQ | 8-band EQ | |
-| Ferment Clip | ADAA mastering clipper (knee / tilt / bias) | [docs/CLIP.md](docs/CLIP.md) |
-| Ferment Limit | dual-stage true-peak limiter | [docs/LIMIT.md](docs/LIMIT.md) |
+**A warm-analog plugin family for people who master loud and listen close.
+Six processors, one signal-chain philosophy: get dense without getting flat.**
 
-## The look
+- **VST3 / AU / CLAP / Standalone**, macOS (arm64 + Intel) and Windows.
+- **Pure C++ DSP core** with a thin JUCE shell — the same engines run
+  headless on iOS.
+- **Vector UI**, one design language across the family: dark face, amber
+  arcs, a needle that actually breathes.
+- **Tested like it matters** — every DSP claim in this repo is backed by a
+  test you can run.
+
+---
+
+## The family
+
+### Glue — SSL-style bus compressor
+
+The "make a mix sound like a record" device: feedback-style detection and
+the famous programme-dependent Auto release. Two dB on the needle, and
+everything belongs together.
 
 ![Ferment Glue](screenshots/glue.png)
 
+### EQ — eight bands with a real graph
+
+Drag the nodes, scroll the Q, watch the spectrum move under the curve.
+The drawn response is verified against the DSP to a tenth of a dB.
+
 ![Ferment EQ](screenshots/eq.png)
 
-| | |
-|---|---|
-| ![Charge](screenshots/charge.png) | ![Clip](screenshots/clip.png) |
-| ![Limit](screenshots/limit.png) | ![Utility](screenshots/utility.png) |
+### Charge — high octane levelling compressor
 
-Screenshots are generated deterministically:
-`cmake --build build --target ferment-screenshots`.
+A vari-mu-style leveller with a saturator and spectral shaper on board.
+No threshold, no knee — one knob of *more*. Runs parallel beautifully:
+dry punch on top, saturated weight underneath. [Read the doc.](docs/CHARGE.md)
 
-Dual-layer architecture: pure C++ DSP (`src-ferment/<plugin>/Ferment*.{h,cpp}`,
-no JUCE — vendored by Cuts iOS) + JUCE wrapper/editor per plugin
-(VST3 / AU / CLAP / Standalone).
+![Ferment Charge](screenshots/charge.png)
 
-## The frozen param ABI
+### Clip — ADAA mastering clipper
 
-Downstream pipelines and the iOS vendor copy address parameters **by
-index** (`kParamA..` aliases in every DSP header). Indices never reorder;
-new parameters append only. Plugin codes (`FmGl`…) and APVTS IDs are
-likewise frozen — DAW sessions depend on them.
+Shaves transients so your limiter stops flinching. Morphing knee, tilt
+clipping that keeps bass from eating the midrange, a bias knob for tube-ish
+even harmonics — and alias suppression that holds up under real drive.
+[Read the doc.](docs/CLIP.md)
 
-## Build
+![Ferment Clip](screenshots/clip.png)
 
-    cmake -B build && cmake --build build -j 8
-    ctest --test-dir build          # DSP + processor tests
+### Limit — dual-stage true-peak limiter
 
-Requires network on first configure (CPM fetches JUCE 8.0.4 +
-clap-juce-extensions). `COPY_PLUGIN_AFTER_BUILD=TRUE` installs into the
-user plugin folders.
+Two stages instead of one envelope: a transient bound that mathematically
+cannot overshoot, riding on a sustain floor with crest-factor auto-release.
+Short hits never pump the level; sustained bass never breathes.
+[Read the doc.](docs/LIMIT.md)
 
-## Installer (macOS)
+![Ferment Limit](screenshots/limit.png)
 
-    scripts/installer_mac/make_ferment_installer.sh VERSION build out res
+### Utility — the housekeeping
 
-Signing/notarization via env: `MAC_SIGNING_CERT` (Developer ID
-Application), `MAC_INSTALLING_CERT` (Developer ID Installer),
-`MAC_SIGNING_ID` / `MAC_SIGNING_TEAM` / `MAC_SIGNING_1UPW` (notarytool).
-Unset = unsigned dev build.
+Gain, phase, width, mid/side solo, DC filter, bass mono. The boring plugin
+you end up using on every track.
 
-## Docs
+![Ferment Utility](screenshots/utility.png)
 
-- `docs/UI_SPEC.md` — normative spec for the `ferment_ui` component kit
-- `docs/{CHARGE,GLUE,CLIP,LIMIT}.md` — per-plugin technical docs
-- `tools/` — screenshot renderer + UI gallery app
+---
 
-Provenance: product tree migrated from the R&D sandbox with history
-(`git filter-repo`); release binaries null-tested against the
-pre-migration builds (Clip/Limit bit-exact, Charge within 2 ULP float32).
+## The chain
+
+The family is designed to be used in this order on a master bus:
+
+```
+Utility  →  Charge  →  EQ  →  Clip  →  Limit
+staging     density     tone    shave    ceiling
+```
+
+Clip runs its ceiling ~0.5 dB above Limit's: the clipper does the fast
+work, the limiter only rounds what the knee lets through.
+
+## Install
+
+Grab the latest build from
+[Actions](https://github.com/dimitrikochnev/ferment-family/actions):
+
+- **macOS** — `ferment-family-<version>-macos-universal.dmg`, a single
+  installer with per-plugin choices (VST3 + AU).
+- **Windows** — `ferment-family-<version>-windows-x64.zip`, drop the
+  `.vst3` folders into `C:\Program Files\Common Files\VST3`.
+
+## Build from source
+
+```
+cmake -B build && cmake --build build -j 8
+ctest --test-dir build
+```
+
+First configure fetches JUCE 8 and clap-juce-extensions. On macOS,
+`COPY_PLUGIN_AFTER_BUILD=TRUE` (default) installs into your user plugin
+folders as you build.
+
+## Documentation
+
+- **[Charge](docs/CHARGE.md)** · **[Glue](docs/GLUE.md)** ·
+  **[Clip](docs/CLIP.md)** · **[Limit](docs/LIMIT.md)** — what each knob
+  does and why
+- **[UI spec](docs/UI_SPEC.md)** — the component kit behind the faceplates
+
+---
+
+## License
+
+MIT © LockVoid Labs ~●~
