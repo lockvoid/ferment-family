@@ -174,19 +174,15 @@ last editor migrates — not before.
 - Utility's private `ToggleLookAndFeel` becomes a kit component the day a
   second editor needs toggles (rule of two).
 
-## 7. PRO wave (approved direction, ticket per item)
+## 7. PRO wave (lead-trimmed 2026-08-12)
 
-1. **Knob text entry** — REQUIRED, moved into §3.1 above. First ticket.
-2. **Keyboard nudge**: focused knob responds to arrows (fine) and
-   shift-arrows (coarse).
-3. **Factory presets**: JUCE program list per plugin (e.g. Charge:
-   Clean Glue / High Octane / Sub-Safe) — currently every plugin ships one
-   program.
-4. **A/B compare + copy** in the header bar (state snapshot, editor-local).
-5. **Soft bypass**: implement `getBypassParameter()` with a click-free ramp
-   so host bypass automation is glitchless.
-6. **UI scale option** (75/100/150 %) persisted in plugin state — pairs
-   with resizable-corner drag.
-7. **VST3 gain-reduction reporting** (IGainReduction-style) so Cubase-class
-   hosts draw GR in the mixer.
-Not doing: internal undo (host owns it via gestures), preset browser UI.
+Wave scope — exactly two items:
+
+1. **Knob text entry** — REQUIRED, specified in §3.1.
+2. **Keyboard nudge**: focused knob responds to arrows (fine step) and
+   shift-arrows (coarse step).
+
+Deferred: factory presets (waiting on handbook naming). Rejected: A/B
+compare (duplicate-device + on/off in the DAW covers it), UI scale
+persistence, in-plugin undo, preset browser. Parked in case a host demands
+them: soft bypass param, VST3 gain-reduction reporting.
