@@ -76,8 +76,14 @@ doesn't — take it to the lead.
   it (labelDim, bold mono 10 px, ALL CAPS, tracked).
 - API: `FermentKnob(apvts, paramID, caption, formatter)` — attachment
   owned internally; `formatter: std::function<juce::String(double norm)>`.
-- Behaviour: vertical+horizontal drag, double-click = reset to default,
-  shift-drag = fine (10x), mouse-wheel steps.
+- Behaviour: vertical+horizontal drag, double-click on the KNOB = reset to
+  default, shift-drag = fine (10x), mouse-wheel steps.
+- **Text entry (required)**: double-click (or single click) on the VALUE
+  label opens an inline editor — type, Enter commits, Esc cancels, Tab
+  commits and moves to the next knob's editor. Parsing accepts the display
+  format loosely ("-9.5", "-9.5 dB", "35%", "2:1"): route through the DSP
+  layer's `parameterTextToValue` mappings, do not reimplement parsing in
+  the editor. Commits wrap in begin/endChangeGesture.
 - Acceptance: drop-in replaces `setupKnob` in the Clip editor with zero
   layout change; screenshot at 2x matches the mock's knob geometry
   (arc thickness ratio, cap/arc radius ratio) within eyeball tolerance
@@ -167,3 +173,20 @@ last editor migrates — not before.
   a 50 ms needle under-reads — a peak-hold bar is the right instrument.
 - Utility's private `ToggleLookAndFeel` becomes a kit component the day a
   second editor needs toggles (rule of two).
+
+## 7. PRO wave (approved direction, ticket per item)
+
+1. **Knob text entry** — REQUIRED, moved into §3.1 above. First ticket.
+2. **Keyboard nudge**: focused knob responds to arrows (fine) and
+   shift-arrows (coarse).
+3. **Factory presets**: JUCE program list per plugin (e.g. Charge:
+   Clean Glue / High Octane / Sub-Safe) — currently every plugin ships one
+   program.
+4. **A/B compare + copy** in the header bar (state snapshot, editor-local).
+5. **Soft bypass**: implement `getBypassParameter()` with a click-free ramp
+   so host bypass automation is glitchless.
+6. **UI scale option** (75/100/150 %) persisted in plugin state — pairs
+   with resizable-corner drag.
+7. **VST3 gain-reduction reporting** (IGainReduction-style) so Cubase-class
+   hosts draw GR in the mixer.
+Not doing: internal undo (host owns it via gestures), preset browser UI.
