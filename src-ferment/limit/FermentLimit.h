@@ -15,10 +15,10 @@
  *  (24 taps/phase — the ITU 12-tap minimum under-reads clipped corners),
  *  group-delay-aligned with the detector, plus a ceiling margin. Full-path
  *  oversampled limiting is deliberately not done (industry consensus:
- *  4x sidechain + margin; see the design notes).
+ *  4x sidechain + margin).
  *
- *  Original implementation from the spec in the design notes; reference
- *  behaviour is the numpy prototype the numpy reference.
+ *  Reference behaviour is a validated numpy implementation; the tests pin
+ *  this port to it.
  * ======================================== */
 
 #ifndef __FermentLimit_FermentLimit_H

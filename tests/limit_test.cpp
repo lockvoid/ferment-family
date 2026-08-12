@@ -1,6 +1,6 @@
 // Ferment Limit DSP tests.
 //
-// Mirrors the numpy reference suite (the validated numpy reference) plus
+// Mirrors the validated numpy reference suite plus
 // C++ plumbing checks. The no-overshoot guarantee is tested *against the
 // math bound*, not the hygiene clamp — samples between the TP-margin bound
 // and the ceiling mean the min/smoother alignment silently broke (that

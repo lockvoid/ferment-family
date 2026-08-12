@@ -1,8 +1,8 @@
 /* ========================================
  *  FermentClip - FermentClipProc.cpp
  *
- *  The DSP loop. Ported from the measured/validated numpy prototype in
- *  the numpy reference; design rationale in the design notes.
+ *  The DSP loop. Ported from the measured and validated numpy reference
+ *  implementation.
  *
  *  Three deliberate choices, do not "correct" without the design doc:
  *

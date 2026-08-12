@@ -115,7 +115,7 @@ private:
     // --- polyphase allpass halfband (one 2x stage direction, one channel) ---
     // A(z) = (c + z^-1)/(1 + c z^-1) sections chained per path;
     // H(z) = 0.5 * (A0(z^2) + z^-1 A1(z^2)). Coefficients validated to
-    // 0.0 dB passband ripple / -104 dB stopband (see the design notes).
+    // 0.0 dB passband ripple / -104 dB stopband.
     struct HalfbandPath {
         const double* c = nullptr;
         int n = 0;

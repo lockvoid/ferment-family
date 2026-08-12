@@ -1,6 +1,6 @@
 // Ferment Clip DSP tests.
 //
-// Mirrors the numpy reference suite (the validated numpy reference) plus the
+// Mirrors the validated numpy reference suite plus the
 // C++-specific plumbing: oversampler transparency, reported latency, delta
 // and mix consistency, safety ceiling. Tolerances reflect the min-phase IIR
 // oversampling (non-integer group delay, no exact nulls) — see

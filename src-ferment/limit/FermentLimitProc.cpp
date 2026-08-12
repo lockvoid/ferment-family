@@ -1,8 +1,8 @@
 /* ========================================
  *  FermentLimit - FermentLimitProc.cpp
  *
- *  The DSP loop. Ported from the validated numpy prototype in
- *  the numpy reference; design rationale in the design notes.
+ *  The DSP loop. Ported from the validated numpy reference
+ *  implementation.
  *
  *  Things that look odd but are load-bearing:
  *

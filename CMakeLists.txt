@@ -1,6 +1,5 @@
 # Ferment Family — standalone home of the Ferment plugin suite.
 #
-# Migrated from the R&D repo (history preserved via git filter-repo).
 # No Airwindows code besides src/airwin_consolidated_base.* — the tiny
 # MIT-licensed AudioEffect compatibility shim the pure-DSP layer builds on.
 # That shim IS the frozen param ABI: index-based setParameter/getParameter,
@@ -52,8 +51,8 @@ add_subdirectory(src-ferment)
 
 # ---- tests ------------------------------------------------------------------
 # Pure-DSP tests build without JUCE; the processor-level tests need it.
-# (tests/sidechain_test.cpp is NOT built here — it needs airwin-registry and
-# stays runnable in the the R&D repo repo.)
+# (the sidechain integration test needs the R&D harness and is not built
+# here.)
 
 if (FERMENT_BUILD_TESTS)
   enable_testing()
