@@ -33,6 +33,8 @@ FERMENT_PLUGINS=(
   "Ferment Charge|ferment-charge|com.ferment.dsp.charge"
   "Ferment Clip|ferment-clip|com.ferment.dsp.clip"
   "Ferment Limit|ferment-limit|com.ferment.dsp.limit"
+  "Ferment Percept|ferment-percept|com.ferment.dsp.percept"
+  "Ferment Master|ferment-master|com.ferment.dsp.master"
 )
 
 SUB_PKGS=()

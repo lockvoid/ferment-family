@@ -4,7 +4,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
 
 **A warm-analog plugin family for people who master loud and listen close.
-Six processors, one signal-chain philosophy: get dense without getting flat.**
+Eight processors, one signal-chain philosophy: get dense without getting
+flat — and a chain that sets itself from what it hears.**
 
 - **VST3 / AU / CLAP / Standalone**, macOS (arm64 + Intel) and Windows.
 - **Pure C++ DSP core** with a thin JUCE shell — the same engines run
@@ -68,6 +69,33 @@ you end up using on every track.
 
 ---
 
+## The adaptive pair
+
+### Percept — the ear before the chain
+
+Realtime measurement the way mastering needs it: gated LUFS, true peak,
+crest, spectral tilt, band share, mono-fold loss. Verdicts as lamps —
+SUB HEAVY, DARK, PRE-CLIPPED, ALREADY DENSE — targets in plain audio
+units, and a chain hint showing exactly what Master would do about it.
+Source mode measures the mix; Result mode verifies the master.
+[Read the doc.](docs/PERCEPT.md)
+
+![Ferment Percept](screenshots/percept.png)
+
+### Master — the whole chain, one Learn
+
+Stage → Charge → Tone → Clip → Limit as one plugin: five cards, five
+bypasses, three meters — and one button. Press **LEARN**, play the loud
+section, and ten seconds later the chain has set itself from what it
+heard: staging, saturation lane, tone, ceilings, then the loudness push.
+Everything lands on ordinary knobs as undoable automation; nothing is
+hidden, everything survives a session reload.
+[Read the doc.](docs/MASTER.md)
+
+![Ferment Master](screenshots/master.png)
+
+---
+
 ## The chain
 
 The family is designed to be used in this order on a master bus:
@@ -79,6 +107,10 @@ staging     density     tone    shave    ceiling
 
 Clip runs its ceiling ~0.5 dB above Limit's: the clipper does the fast
 work, the limiter only rounds what the knee lets through.
+
+Or put **Ferment Master** on the bus and press LEARN — it is this chain,
+with the measurement built in. **Percept** before it (or after, in Result
+mode) shows what the chain is doing and why.
 
 ## Install
 
@@ -104,8 +136,9 @@ folders as you build.
 ## Documentation
 
 - **[Charge](docs/CHARGE.md)** · **[Glue](docs/GLUE.md)** ·
-  **[Clip](docs/CLIP.md)** · **[Limit](docs/LIMIT.md)** — what each knob
-  does and why
+  **[Clip](docs/CLIP.md)** · **[Limit](docs/LIMIT.md)** ·
+  **[Percept](docs/PERCEPT.md)** · **[Master](docs/MASTER.md)** — what
+  each knob does and why
 - **[UI spec](docs/UI_SPEC.md)** — the component kit behind the faceplates
 
 ---
