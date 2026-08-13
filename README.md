@@ -115,17 +115,18 @@ mode) shows what the chain is doing and why.
 ## Install
 
 Grab the latest build from
-[Actions](https://github.com/lockvoid/ferment-family/actions):
+[Releases](https://github.com/lockvoid/ferment-family/releases/latest):
 
-- **macOS** — `ferment-family-macos-universal.dmg`, a single installer with
-  per-plugin choices (VST3 + AU). Unsigned for now: right-click the pkg and
-  choose Open the first time.
-- **Windows** — `ferment-family-windows-x64.zip`, drop the `.vst3` folders
-  into `C:\Program Files\Common Files\VST3`.
+- **macOS** — [`ferment-family-macos-universal.dmg`](https://github.com/lockvoid/ferment-family/releases/latest/download/ferment-family-macos-universal.dmg),
+  a single installer with per-plugin choices (VST3 + AU). Unsigned for now:
+  right-click the pkg and choose Open the first time.
+- **Windows** — [`ferment-family-windows-x64.zip`](https://github.com/lockvoid/ferment-family/releases/latest/download/ferment-family-windows-x64.zip),
+  drop the `.vst3` folders into `C:\Program Files\Common Files\VST3`.
 
-The file names carry no version — they are stable download URLs. The version
-is inside: the installer's title bar, the mounted volume, and the package
-itself (which is how macOS knows an install is an upgrade).
+The file names carry no version — those `releases/latest/download/` links are
+stable and always resolve to the newest release. The version is inside: the
+installer's title bar, the mounted volume, and the package itself (which is how
+macOS knows an install is an upgrade).
 
 ## Build from source
 

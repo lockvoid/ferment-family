@@ -1,0 +1,162 @@
+name: release
+
+# Manual only.  Builds the macOS installer and the Windows VST3 zip, and — for
+# anything other than a "none" bump — commits the new version, tags it, and
+# publishes a GitHub release with both files attached.
+#
+# The bump is deliberately NOT pushed until both platforms are green.  A build
+# here takes the better part of an hour across two runners; tagging first would
+# mean every failed run leaves a dangling tag and a version commit to unwind by
+# hand.  So the version is computed up front, patched into CMakeLists.txt inside
+# each build job, and only committed once there is something to release.
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: "Bump version"
+        required: true
+        default: "patch"
+        type: choice
+        options:
+          - none
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    name: version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      release: ${{ steps.bump.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute version
+        id: bump
+        run: |
+          cur=$(sed -n 's/^project(ferment-family VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          : "${cur:?could not read version from CMakeLists.txt}"
+          IFS=. read -r major minor patch <<< "$cur"
+          case "${{ inputs.version_type }}" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+            none)  ;;
+          esac
+          ver="$major.$minor.$patch"
+
+          release=true
+          [ "${{ inputs.version_type }}" = "none" ] && release=false
+
+          # Fail in ten seconds rather than after an hour of building.
+          if [ "$release" = true ] && git ls-remote --exit-code --tags origin "v$ver" > /dev/null 2>&1; then
+            echo "::error::tag v$ver already exists"
+            exit 1
+          fi
+
+          echo "version=$ver"   >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "$cur -> $ver (publish a release: $release)"
+
+  macos:
+    name: macos
+    needs: version
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stamp version
+        run: |
+          sed -i '' "s/^project(ferment-family VERSION [0-9.]*/project(ferment-family VERSION ${{ needs.version.outputs.version }}/" CMakeLists.txt
+          grep -n '^project(ferment-family' CMakeLists.txt
+      - name: Configure (universal)
+        run: >
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          -DCOPY_PLUGIN_AFTER_BUILD=FALSE
+      - name: Build
+        run: cmake --build build -j 3
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      # The version goes inside the pkg, where macOS uses it to tell an upgrade
+      # from a fresh install.  The file name carries no version at all — it is
+      # served from a fixed URL.
+      - name: Package (unsigned)
+        run: |
+          FERMENT_ARCH=universal bash scripts/installer_mac/make_ferment_installer.sh \
+            "${{ needs.version.outputs.version }}" build dist scripts/installer_mac/resources
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal-dmg
+          path: dist/*.dmg
+
+  windows:
+    name: windows
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stamp version
+        shell: pwsh
+        run: |
+          $ver = "${{ needs.version.outputs.version }}"
+          (Get-Content CMakeLists.txt) -replace '^project\(ferment-family VERSION [0-9.]+', "project(ferment-family VERSION $ver" |
+            Set-Content CMakeLists.txt
+          Select-String -Path CMakeLists.txt -Pattern '^project\(ferment-family'
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCOPY_PLUGIN_AFTER_BUILD=FALSE
+      - name: Build
+        run: cmake --build build --config Release -j 3
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Package VST3 zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          # No version in the name: fixed download URL, same as the macOS DMG.
+          $out = "dist/ferment-family-windows-x64"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          Get-ChildItem -Recurse -Directory build/src-ferment -Filter "*.vst3" |
+            Where-Object { $_.FullName -match "Release" } |
+            ForEach-Object { Copy-Item -Recurse $_.FullName $out }
+          Compress-Archive -Path $out -DestinationPath "$out.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-vst3
+          path: dist/*.zip
+
+  publish:
+    name: publish
+    needs: [ version, macos, windows ]
+    if: ${{ needs.version.outputs.release == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Commit bump and tag
+        run: |
+          ver="${{ needs.version.outputs.version }}"
+          sed -i "s/^project(ferment-family VERSION [0-9.]*/project(ferment-family VERSION $ver/" CMakeLists.txt
+          git config user.name "LockVoid /dev/null"
+          git config user.email "dev@lockvoid.com"
+          git add CMakeLists.txt
+          git commit -m "$ver"
+          git tag "v$ver"
+          git push origin "HEAD:${{ github.ref_name }}"
+          git push origin "v$ver"
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver="${{ needs.version.outputs.version }}"
+          ls -la dist
+          gh release create "v$ver" \
+            --title "v$ver" \
+            --generate-notes \
+            dist/*.dmg dist/*.zip
