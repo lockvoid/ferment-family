@@ -1,0 +1,35 @@
+name: ci
+
+# Tests only.  Building an installer is the release workflow's job, so this
+# stays as short as it can be: host architecture only (no universal binary),
+# no packaging, no upload.
+on:
+  push:
+    branches: [ main, master, dual-layer-port ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # A broken Windows build should not cancel the macOS run, and vice
+      # versa — we want to see both verdicts from one push.
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            build_flags: ""
+            ctest_flags: ""
+          - os: windows-latest
+            build_flags: "--config Release"
+            ctest_flags: "-C Release"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCOPY_PLUGIN_AFTER_BUILD=FALSE
+      - name: Build
+        run: cmake --build build ${{ matrix.build_flags }} -j 3
+      - name: Test
+        run: ctest --test-dir build ${{ matrix.ctest_flags }} --output-on-failure
