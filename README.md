@@ -7,7 +7,7 @@
 Eight processors, one signal-chain philosophy: get dense without getting
 flat — and a chain that sets itself from what it hears.**
 
-- **VST3 / AU / CLAP / Standalone**, macOS (arm64 + Intel) and Windows.
+- **VST3 / AU / CLAP / Standalone**, macOS (Apple Silicon) and Windows.
 - **Pure C++ DSP core** with a thin JUCE shell — the same engines run
   headless on iOS.
 - **Vector UI**, one design language across the family: dark face, amber
@@ -117,9 +117,10 @@ mode) shows what the chain is doing and why.
 Grab the latest build from
 [Releases](https://github.com/lockvoid/ferment-family/releases/latest):
 
-- **macOS** — [`ferment-family-macos-universal.dmg`](https://github.com/lockvoid/ferment-family/releases/latest/download/ferment-family-macos-universal.dmg),
+- **macOS (Apple Silicon)** — [`ferment-family-macos-arm64.dmg`](https://github.com/lockvoid/ferment-family/releases/latest/download/ferment-family-macos-arm64.dmg),
   a single installer with per-plugin choices (VST3 + AU). Unsigned for now:
-  right-click the pkg and choose Open the first time.
+  right-click the pkg and choose Open the first time. The build is arm64 only,
+  so a host running under Rosetta will not see the plugins.
 - **Windows** — [`ferment-family-windows-x64.zip`](https://github.com/lockvoid/ferment-family/releases/latest/download/ferment-family-windows-x64.zip),
   drop the `.vst3` folders into `C:\Program Files\Common Files\VST3`.
 

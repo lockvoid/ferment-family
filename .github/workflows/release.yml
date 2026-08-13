@@ -72,25 +72,28 @@ jobs:
         run: |
           sed -i '' "s/^project(ferment-family VERSION [0-9.]*/project(ferment-family VERSION ${{ needs.version.outputs.version }}/" CMakeLists.txt
           grep -n '^project(ferment-family' CMakeLists.txt
-      - name: Configure (universal)
+      # Apple Silicon only.  Pinned rather than left to the runner's host
+      # architecture so the slice we ship is a decision, not a property of
+      # whatever macos-14 happens to be.
+      - name: Configure (arm64)
         run: >
           cmake -B build -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          -DCMAKE_OSX_ARCHITECTURES=arm64
           -DCOPY_PLUGIN_AFTER_BUILD=FALSE
       - name: Build
         run: cmake --build build -j 3
       - name: Test
         run: ctest --test-dir build --output-on-failure
       # The version goes inside the pkg, where macOS uses it to tell an upgrade
-      # from a fresh install.  The file name carries no version at all — it is
-      # served from a fixed URL.
+      # from a fresh install.  The file name carries the architecture but no
+      # version — it is served from a fixed URL.
       - name: Package (unsigned)
         run: |
-          FERMENT_ARCH=universal bash scripts/installer_mac/make_ferment_installer.sh \
+          FERMENT_ARCH=arm64 bash scripts/installer_mac/make_ferment_installer.sh \
             "${{ needs.version.outputs.version }}" build dist scripts/installer_mac/resources
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-universal-dmg
+          name: macos-arm64-dmg
           path: dist/*.dmg
 
   windows:
